@@ -3,9 +3,7 @@ import { useState, useEffect } from "react";
 const fmt = (n) => "¥" + Math.round(n || 0).toLocaleString("ja-JP") + "円";
 const fmtEx = (n) => "¥" + Math.round((n || 0) / 1.1).toLocaleString("ja-JP") + "円";
 const today = () => new Date().toISOString().split("T")[0];
-const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}年${d.getMonth()+1}月`; };
 
-// 決算期から12ヶ月のリストを生成
 const getFiscalMonths = (startMonth, year) => {
   const months = [];
   for (let i = 0; i < 12; i++) {
@@ -16,7 +14,6 @@ const getFiscalMonths = (startMonth, year) => {
   return months;
 };
 
-// 決算期の開始年を計算
 const getFiscalYear = (startMonth, fiscalNum) => {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -164,6 +161,138 @@ function N({ v, modal, setModal, style }) {
   return <span style={{ cursor:"pointer", borderBottom:"1.5px dashed #c5d0e0", paddingBottom:1, ...style }} onClick={() => setModal(modal)} title="クリックで根拠を表示">{v}</span>;
 }
 
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master }) {
+  const coName = master?.company?.name || "Soku経理";
+  const navItems = [
+    { id:"home",     icon:"◈", label:"ダッシュボード" },
+    { id:"sales",    icon:"↑", label:"売上入力" },
+    { id:"expenses", icon:"↓", label:"経費入力" },
+    { id:"pl",       icon:"≡", label:"損益計算書" },
+    { id:"ar",       icon:"◎", label:"売掛・買掛" },
+    { id:"cashflow", icon:"⇄", label:"資金繰り" },
+    { id:"master",   icon:"⚙", label:"マスター設定" },
+  ];
+  return (
+    <div className="sidebar" style={{ width:240, minHeight:"100vh", background:"#1a2340", position:"fixed", top:0, left:0, display:"flex", flexDirection:"column", zIndex:100 }}>
+      <div style={{ padding:"28px 20px 16px" }}>
+        <div style={{ fontSize:21, fontWeight:800, color:"#fff", letterSpacing:-0.5 }}>
+          {coName.length > 10 ? "Soku経理" : coName}
+        </div>
+        <div style={{ fontSize:11, color:"#4d6a99", marginTop:3 }}>経営管理クラウド</div>
+      </div>
+      <nav style={{ flex:1, padding:"4px 12px" }}>
+        {navItems.map(item => (
+          <button key={item.id} onClick={() => setScreen(item.id)} style={{
+            display:"flex", alignItems:"center", gap:12, width:"100%",
+            padding:"10px 14px", borderRadius:8, border:"none", cursor:"pointer",
+            background: screen === item.id ? "rgba(255,255,255,0.13)" : "transparent",
+            color: screen === item.id ? "#fff" : "#7a95bb",
+            fontSize:13, fontWeight: screen === item.id ? 600 : 400,
+            marginBottom:2, textAlign:"left", transition:"all 0.15s",
+          }}>
+            <span style={{ fontSize:15, width:20, textAlign:"center" }}>{item.icon}</span>
+            {item.label}
+            {screen === item.id && <span style={{ marginLeft:"auto", width:3, height:18, borderRadius:2, background:"#4d9ef7", display:"block" }} />}
+          </button>
+        ))}
+        {opInvoice
+          ? <button onClick={() => setScreen("invoice")} style={{ display:"flex", alignItems:"center", gap:12, width:"100%", padding:"10px 14px", borderRadius:8, border:"none", cursor:"pointer", background: screen==="invoice" ? "#1a6fd4" : "rgba(26,111,212,0.18)", color: screen==="invoice" ? "#fff" : "#7bb8f5", fontSize:13, fontWeight:600, marginBottom:2, textAlign:"left" }}>
+              <span style={{ fontSize:15, width:20, textAlign:"center" }}>✦</span>
+              請求書
+              {screen === "invoice" && <span style={{ marginLeft:"auto", width:3, height:18, borderRadius:2, background:"#fff", display:"block" }} />}
+            </button>
+          : <button onClick={showOPModal} style={{ display:"flex", alignItems:"center", gap:12, width:"100%", padding:"10px 14px", borderRadius:8, border:"none", cursor:"pointer", background:"transparent", color:"#3d5474", fontSize:13, marginBottom:2, textAlign:"left" }}>
+              <span style={{ fontSize:15, width:20, textAlign:"center" }}>🔒</span>
+              請求書
+            </button>
+        }
+      </nav>
+      <div style={{ padding:"16px 20px 24px", borderTop:"1px solid rgba(255,255,255,0.07)" }}>
+        <div style={{ fontSize:10, color:"#4d6a99", fontWeight:600, marginBottom:8, letterSpacing:0.5 }}>表示モード</div>
+        <div style={{ display:"flex", background:"rgba(0,0,0,0.25)", borderRadius:6, padding:3, gap:2 }}>
+          <button onClick={() => setTaxMode("inc")} style={{ flex:1, padding:"5px 0", borderRadius:4, border:"none", background:taxMode==="inc"?"rgba(255,255,255,0.18)":"transparent", color:taxMode==="inc"?"#fff":"#4d6a99", fontSize:12, cursor:"pointer", fontWeight:taxMode==="inc"?700:400 }}>税込</button>
+          <button onClick={() => setTaxMode("exc")} style={{ flex:1, padding:"5px 0", borderRadius:4, border:"none", background:taxMode==="exc"?"rgba(255,255,255,0.18)":"transparent", color:taxMode==="exc"?"#fff":"#4d6a99", fontSize:12, cursor:"pointer", fontWeight:taxMode==="exc"?700:400 }}>税抜</button>
+        </div>
+        <div style={{ fontSize:10, color:"#2d3d56", marginTop:12 }}>数字をクリックで根拠表示</div>
+      </div>
+    </div>
+  );
+}
+
+// ── BOTTOM NAV (mobile) ───────────────────────────────────────────────────────
+function BottomNav({ screen, setScreen, opInvoice, showOPModal }) {
+  const items = [
+    { id:"home",     label:"ホーム",   icon:"◈" },
+    { id:"sales",    label:"売上",     icon:"↑" },
+    { id:"expenses", label:"経費",     icon:"↓" },
+    { id:"pl",       label:"損益",     icon:"≡" },
+    { id:"ar",       label:"消込",     icon:"◎" },
+  ];
+  return (
+    <div className="bottom-nav" style={{ position:"fixed", bottom:0, left:0, right:0, background:"#fff", borderTop:"1px solid #e8ecf3", display:"none", zIndex:100, height:58, boxShadow:"0 -2px 12px rgba(0,0,0,0.06)" }}>
+      {items.map(item => (
+        <button key={item.id} onClick={() => setScreen(item.id)} style={{
+          flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+          border:"none", background:"transparent", cursor:"pointer",
+          color: screen === item.id ? "#1a6fd4" : "#aaa",
+          fontSize:10, fontWeight: screen===item.id ? 700 : 400, gap:3, height:"100%",
+        }}>
+          <span style={{ fontSize:18, lineHeight:1 }}>{item.icon}</span>
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── MONTH BAR ─────────────────────────────────────────────────────────────────
+function MonthBar({ selMonth, setSelMonth, fiscalMonths }) {
+  return (
+    <div style={{ display:"flex", gap:4, marginBottom:16, flexWrap:"wrap" }}>
+      {fiscalMonths.map(m => (
+        <button key={m} style={{ padding:"5px 12px", borderRadius:20, border:"1px solid", borderColor:selMonth===m?"#1a6fd4":"#e0e0e0", background:selMonth===m?"#1a6fd4":"#fff", color:selMonth===m?"#fff":"#777", fontSize:11, cursor:"pointer", fontWeight:selMonth===m?700:400 }} onClick={() => setSelMonth(m)}>{m}</button>
+      ))}
+    </div>
+  );
+}
+
+// ── DONUT CHART ───────────────────────────────────────────────────────────────
+function DonutChart({ sales, expenses, size, setModal, val }) {
+  const sz = size || 240;
+  const total = sales + expenses;
+  const cx = sz / 2, cy = sz / 2;
+  const r = sz * 0.37;
+  const stroke = sz * 0.14;
+  const circ = 2 * Math.PI * r;
+  const profitRatio = sales > 0 ? Math.round((sales - expenses) / sales * 100) : 0;
+
+  if (total === 0) return (
+    <div style={{ width:sz, height:sz, borderRadius:"50%", background:"#e8ecf3", display:"flex", alignItems:"center", justifyContent:"center", color:"#bbb", fontSize:13 }}>データなし</div>
+  );
+
+  const salesRatio = sales / total;
+  const salesDash = circ * salesRatio;
+  const expDash = circ * (expenses / total);
+
+  return (
+    <div style={{ position:"relative", width:sz, height:sz, flexShrink:0 }}>
+      <svg width={sz} height={sz} style={{ transform:"rotate(-90deg)" }}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e8ecf3" strokeWidth={stroke} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#FCEBEB" strokeWidth={stroke}
+          strokeDasharray={`${expDash} ${circ - expDash}`}
+          strokeDashoffset={-salesDash} strokeLinecap="butt" />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1a6fd4" strokeWidth={stroke}
+          strokeDasharray={`${salesDash} ${circ - salesDash}`} strokeLinecap="butt" />
+      </svg>
+      <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", pointerEvents:"none" }}>
+        <div style={{ fontSize:11, color:"#999", marginBottom:2, fontWeight:600 }}>利益率</div>
+        <div style={{ fontSize:36, fontWeight:900, color:profitRatio >= 0 ? "#185FA5" : "#A32D2D", letterSpacing:-2, lineHeight:1 }}>{profitRatio}<span style={{ fontSize:16 }}>%</span></div>
+      </div>
+    </div>
+  );
+}
+
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const saved = load();
@@ -203,258 +332,99 @@ export default function App() {
   const Screen = Screens[screen] || HomeScreen;
 
   return (
-    <div style={s.root}>
+    <div style={{ fontFamily:"'Hiragino Sans','Noto Sans JP',sans-serif", fontSize:13, minHeight:"100vh" }}>
       <style>{css}</style>
-      {toast && <div style={{ ...s.toast, background:toast.type==="error"?"#FCEBEB":"#EAF3DE", color:toast.type==="error"?"#A32D2D":"#27500A", borderColor:toast.type==="error"?"#F09595":"#97C459" }}>{toast.type==="error"?"⚠ ":"✓ "}{toast.msg}</div>}
+      {toast && <div style={{ position:"fixed", top:16, right:16, zIndex:300, padding:"10px 16px", borderRadius:8, border:"1px solid", fontSize:13, fontWeight:500, background:toast.type==="error"?"#FCEBEB":"#EAF3DE", color:toast.type==="error"?"#A32D2D":"#27500A", borderColor:toast.type==="error"?"#F09595":"#97C459" }}>{toast.type==="error"?"⚠ ":"✓ "}{toast.msg}</div>}
       <DrillModal modal={modal} onClose={() => setModal(null)} />
       {showOPModal && <OPModal onClose={() => setShowOPModal(false)} onContract={() => { setOpInvoice(true); setShowOPModal(false); setScreen("invoice"); showToast("請求書オプションを契約しました！"); }} />}
-      <Screen {...shared} />
-    </div>
-  );
-}
-
-// ── TOPBAR ────────────────────────────────────────────────────────────────────
-function TopBar({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master }) {
-  const baseTabs = [
-    { id:"home",     label:"ホーム" },
-    { id:"sales",    label:"売上入力" },
-    { id:"expenses", label:"経費入力" },
-    { id:"pl",       label:"損益計算書" },
-    { id:"ar",       label:"売掛・買掛" },
-    { id:"cashflow", label:"資金繰り" },
-    { id:"master",   label:"⚙ マスター" },
-  ];
-  const coName = master?.company?.name || "Soku経理";
-  return (
-    <div style={s.topbar}>
-      <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-        <div style={s.logo}>{coName.length > 8 ? "Soku<span>経理</span>" : coName}<span style={{ color:"#1a6fd4" }}> 経理</span></div>
-        <div style={{ display:"flex", gap:2, alignItems:"center" }}>
-          {baseTabs.map(t => <button key={t.id} style={{ ...s.navTab, ...(screen===t.id?s.navTabActive:{}) }} onClick={() => setScreen(t.id)}>{t.label}</button>)}
-          {opInvoice
-            ? <button style={{ ...s.navTab, ...s.navTabOP, ...(screen==="invoice"?s.navTabOPActive:{}) }} onClick={() => setScreen("invoice")}>✦ 請求書</button>
-            : <button style={{ ...s.navTab, ...s.navTabLocked }} onClick={showOPModal} title="オプション契約で利用可能">🔒 請求書</button>
-          }
-        </div>
+      <Sidebar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={() => setShowOPModal(true)} master={master} />
+      <div className="main-area" style={{ marginLeft:240, background:"#f4f6fb", minHeight:"100vh" }}>
+        <Screen {...shared} />
       </div>
-      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-        <span style={{ fontSize:11, color:"#bbb" }}>数字をクリックで根拠を表示</span>
-        <div style={s.taxSwitch}>
-          <button style={{ ...s.taxBtn, ...(taxMode==="inc"?s.taxActive:{}) }} onClick={() => setTaxMode("inc")}>税込</button>
-          <button style={{ ...s.taxBtn, ...(taxMode==="exc"?s.taxActive:{}) }} onClick={() => setTaxMode("exc")}>税抜</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MonthBar({ selMonth, setSelMonth, fiscalMonths }) {
-  return (
-    <div style={s.monthBar}>
-      {fiscalMonths.map(m => <button key={m} style={{ ...s.monthBtn, ...(selMonth===m?s.monthActive:{}) }} onClick={() => setSelMonth(m)}>{m}</button>)}
-    </div>
-  );
-}
-
-// ── MASTER SCREEN ─────────────────────────────────────────────────────────────
-function MasterScreen({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master, setMaster, showToast }) {
-  const [tab, setTab] = useState("company");
-  const [co, setCo] = useState(master.company);
-  const [accounts, setAccounts] = useState(master.accounts);
-  const [clients, setClients] = useState(master.clients);
-  const [newClient, setNewClient] = useState({ name:"", addr:"", bankName:"", bankBranch:"", bankType:"普通", bankNo:"", bankHolder:"" });
-  const [newAccount, setNewAccount] = useState({ label:"", category:"sga", examples:"" });
-
-  const saveMaster = () => {
-    setMaster({ ...master, company:co, accounts, clients });
-    showToast("マスター情報を保存しました");
-  };
-
-  return (
-    <div style={s.page}>
-      <TopBar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={showOPModal} master={master} />
-      <div style={s.content}>
-        <div style={s.pageHeader}>
-          <div style={s.pageTitle}>⚙ マスター設定</div>
-          <button style={s.btnP} onClick={saveMaster}>保存する</button>
-        </div>
-
-        <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-          {[["company","🏢 会社情報"],["accounts","📋 勘定科目"],["clients","👥 取引先"]].map(([id,label]) => (
-            <button key={id} style={{ ...s.navTab, ...(tab===id?s.navTabActive:{}), fontSize:13, padding:"8px 16px" }} onClick={() => setTab(id)}>{label}</button>
-          ))}
-        </div>
-
-        {tab === "company" && (
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-            <div style={s.formCard}>
-              <div style={s.formTitle}>基本情報</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                <FR label="会社名・屋号"><input style={s.inp} value={co.name} onChange={e=>setCo({...co,name:e.target.value})} placeholder="株式会社〇〇" /></FR>
-                <FR label="法人 / 個人事業主">
-                  <select style={s.inp} value={co.type} onChange={e=>setCo({...co,type:e.target.value})}>
-                    <option>法人</option><option>個人事業主</option>
-                  </select>
-                </FR>
-                <FR label="設立年"><input style={s.inp} value={co.established} onChange={e=>setCo({...co,established:e.target.value})} placeholder="2020" /></FR>
-                <FR label="資本金"><input style={s.inp} value={co.capital} onChange={e=>setCo({...co,capital:e.target.value})} placeholder="1000000" /></FR>
-                <FR label="住所"><input style={s.inp} value={co.addr} onChange={e=>setCo({...co,addr:e.target.value})} placeholder="東京都〇〇区..." /></FR>
-                <FR label="電話番号"><input style={s.inp} value={co.tel} onChange={e=>setCo({...co,tel:e.target.value})} placeholder="03-0000-0000" /></FR>
-                <FR label="メール"><input style={s.inp} value={co.email} onChange={e=>setCo({...co,email:e.target.value})} placeholder="info@example.com" /></FR>
-              </div>
-            </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-              <div style={s.formCard}>
-                <div style={s.formTitle}>決算・税務設定</div>
-                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                  <FR label="決算月（開始月）" hint="例）3月決算なら「4月」が期首になります">
-                    <select style={s.inp} value={co.fiscalMonth} onChange={e=>setCo({...co,fiscalMonth:Number(e.target.value)})}>
-                      {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{m}月始まり（{m===1?12:m-1}月決算）</option>)}
-                    </select>
-                  </FR>
-                  <FR label="第何期目">
-                    <input type="number" style={s.inp} value={co.fiscalNum} onChange={e=>setCo({...co,fiscalNum:Number(e.target.value)})} placeholder="1" min="1" />
-                  </FR>
-                  <FR label="予定税率（%）" hint="法人税・住民税・事業税の合計。中小企業は約25〜35%が目安です">
-                    <select style={s.inp} value={co.taxRate} onChange={e=>setCo({...co,taxRate:Number(e.target.value)})}>
-                      {[15,20,25,30,33,35,40].map(r=><option key={r} value={r}>{r}%</option>)}
-                    </select>
-                  </FR>
-                </div>
-              </div>
-              <div style={s.formCard}>
-                <div style={s.formTitle}>振込先口座</div>
-                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                  <FR label="銀行名"><input style={s.inp} value={co.bankName} onChange={e=>setCo({...co,bankName:e.target.value})} placeholder="〇〇銀行" /></FR>
-                  <FR label="支店名"><input style={s.inp} value={co.bankBranch} onChange={e=>setCo({...co,bankBranch:e.target.value})} placeholder="〇〇支店" /></FR>
-                  <FR label="口座種別"><select style={s.inp} value={co.bankType} onChange={e=>setCo({...co,bankType:e.target.value})}><option>普通</option><option>当座</option></select></FR>
-                  <FR label="口座番号"><input style={s.inp} value={co.bankNo} onChange={e=>setCo({...co,bankNo:e.target.value})} placeholder="1234567" /></FR>
-                  <FR label="口座名義"><input style={s.inp} value={co.bankHolder} onChange={e=>setCo({...co,bankHolder:e.target.value})} placeholder="カ)マルマル" /></FR>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "accounts" && (
-          <div>
-            <div style={s.tblWrap}>
-              <table style={s.tbl}>
-                <thead><tr>{["科目名","分類","使用例",""].map(h=><th key={h} style={{ ...s.th, textAlign:"left" }}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {accounts.map((a,i) => (
-                    <tr key={a.id} style={s.tr}>
-                      <td style={{ ...s.td, fontWeight:500 }}>{a.label}</td>
-                      <td style={s.td}><span style={{ ...s.badge, ...(a.category==="revenue"?s.bGreen:a.category==="cogs"?s.bAmber:s.bGreen) }}>{a.category==="revenue"?"売上":a.category==="cogs"?"原価":"販管費"}</span></td>
-                      <td style={{ ...s.td, color:"#888", fontSize:11 }}>{a.examples}</td>
-                      <td style={s.td}>
-                        <input style={{ ...s.inp, width:200, fontSize:11 }} value={a.examples} onChange={e=>setAccounts(prev=>prev.map((ac,idx)=>idx===i?{...ac,examples:e.target.value}:ac))} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={s.formCard}>
-              <div style={s.formTitle}>勘定科目を追加</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 2fr auto", gap:10, alignItems:"end" }}>
-                <FR label="科目名"><input style={s.inp} value={newAccount.label} onChange={e=>setNewAccount({...newAccount,label:e.target.value})} placeholder="新しい科目名" /></FR>
-                <FR label="分類">
-                  <select style={s.inp} value={newAccount.category} onChange={e=>setNewAccount({...newAccount,category:e.target.value})}>
-                    <option value="revenue">売上</option><option value="cogs">原価</option><option value="sga">販管費</option>
-                  </select>
-                </FR>
-                <FR label="使用例"><input style={s.inp} value={newAccount.examples} onChange={e=>setNewAccount({...newAccount,examples:e.target.value})} placeholder="例：〇〇費、△△代など" /></FR>
-                <button style={{ ...s.btnP, height:36 }} onClick={() => {
-                  if (!newAccount.label) return;
-                  setAccounts(prev=>[...prev,{ ...newAccount, id:`custom_${Date.now()}` }]);
-                  setNewAccount({ label:"", category:"sga", examples:"" });
-                }}>追加</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "clients" && (
-          <div>
-            <div style={s.tblWrap}>
-              <table style={s.tbl}>
-                <thead><tr>{["会社名","住所","銀行","口座番号","名義",""].map(h=><th key={h} style={{ ...s.th, textAlign:"left" }}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {clients.map((c,i) => (
-                    <tr key={c.id} style={s.tr}>
-                      <td style={{ ...s.td, fontWeight:500 }}>{c.name}</td>
-                      <td style={{ ...s.td, color:"#888", fontSize:11 }}>{c.addr}</td>
-                      <td style={{ ...s.td, fontSize:11 }}>{c.bankName} {c.bankBranch}</td>
-                      <td style={{ ...s.td, fontSize:11 }}>{c.bankType} {c.bankNo}</td>
-                      <td style={{ ...s.td, fontSize:11 }}>{c.bankHolder}</td>
-                      <td style={s.td}><button style={{ ...s.btnS, fontSize:11, padding:"3px 10px", color:"#A32D2D", borderColor:"#f09595" }} onClick={() => setClients(prev=>prev.filter((_,idx)=>idx!==i))}>削除</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={s.formCard}>
-              <div style={s.formTitle}>取引先を追加</div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
-                <FR label="会社名"><input style={s.inp} value={newClient.name} onChange={e=>setNewClient({...newClient,name:e.target.value})} placeholder="㈱〇〇商事" /></FR>
-                <FR label="住所"><input style={s.inp} value={newClient.addr} onChange={e=>setNewClient({...newClient,addr:e.target.value})} placeholder="東京都..." /></FR>
-                <FR label="銀行名"><input style={s.inp} value={newClient.bankName} onChange={e=>setNewClient({...newClient,bankName:e.target.value})} placeholder="〇〇銀行" /></FR>
-                <FR label="支店名"><input style={s.inp} value={newClient.bankBranch} onChange={e=>setNewClient({...newClient,bankBranch:e.target.value})} placeholder="〇〇支店" /></FR>
-                <FR label="口座種別"><select style={s.inp} value={newClient.bankType} onChange={e=>setNewClient({...newClient,bankType:e.target.value})}><option>普通</option><option>当座</option></select></FR>
-                <FR label="口座番号"><input style={s.inp} value={newClient.bankNo} onChange={e=>setNewClient({...newClient,bankNo:e.target.value})} placeholder="1234567" /></FR>
-                <FR label="口座名義"><input style={s.inp} value={newClient.bankHolder} onChange={e=>setNewClient({...newClient,bankHolder:e.target.value})} placeholder="カ)マルマル" /></FR>
-              </div>
-              <div style={{ textAlign:"right", marginTop:10 }}>
-                <button style={s.btnP} onClick={() => {
-                  if (!newClient.name) return;
-                  setClients(prev=>[...prev,{ ...newClient, id:Date.now() }]);
-                  setNewClient({ name:"", addr:"", bankName:"", bankBranch:"", bankType:"普通", bankNo:"", bankHolder:"" });
-                }}>追加する</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <BottomNav screen={screen} setScreen={setScreen} opInvoice={opInvoice} showOPModal={() => setShowOPModal(true)} />
     </div>
   );
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
-function HomeScreen({ screen, setScreen, taxMode, setTaxMode, totalSales, totalExp, opProfit, netProfit, ar, ap, val, sales, expenses, selMonth, setModal, curSales, curExp, grossProfit, taxAmt, genka, sga, opInvoice, showOPModal, master, taxRate, fiscalMonths }) {
+function HomeScreen({ setScreen, taxMode, totalSales, totalExp, opProfit, netProfit, ar, ap, val, sales, expenses, selMonth, setSelMonth, setModal, curSales, curExp, grossProfit, taxAmt, genka, sga, taxRate, fiscalMonths, master }) {
   const arCount = sales.filter(s=>s.status==="未入金").length;
   const apCount = expenses.filter(e=>e.status==="未払い").length;
   const fiscalIdx = fiscalMonths.indexOf(selMonth);
   const fiscalLabel = fiscalIdx >= 0 ? `第${master.company.fiscalNum || 1}期 ${fiscalIdx+1}ヶ月目` : "";
-  const cards = [
-    { label:"今月売上", v:val(totalSales), color:"#0F6E56", sub:"前月比 +12.4%", modal:{ title:`${selMonth}　売上合計`, amount:val(totalSales), color:"#0F6E56", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"区分":r.type,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
-    { label:"今月経費", v:val(totalExp),   color:"#333",    sub:"前月比 +2.1%",  modal:{ title:`${selMonth}　経費合計`, amount:val(totalExp), formula:`売上原価 ${val(genka)}\n＋ 販管費合計 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
-    { label:"営業利益", v:val(opProfit),   color:"#185FA5", sub:`利益率 ${totalSales?Math.round(opProfit/totalSales*100):0}%`, modal:{ title:"営業利益", amount:val(opProfit), color:"#185FA5", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。税金・借入返済前の数字です。" }},
-    { label:"予定経常利益", v:val(netProfit), color:"#0F6E56", sub:`納税${taxRate}%控除後`, modal:{ title:"予定経常利益", amount:val(netProfit), color:"#0F6E56", formula:`営業利益 ${val(opProfit)}\nー 予定納税（${taxRate}%） ${val(taxAmt)}\n＝ 予定経常利益 ${val(netProfit)}`, note:`マスターで設定した税率${taxRate}%で試算しています。実際は税理士に確認ください。` }},
-    { label:"売掛残高", v:val(ar), color:"#854F0B", sub:`${arCount}件 未入金`, modal:{ title:"売掛残高（未入金合計）", amount:val(ar), color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }},
-    { label:"買掛残高", v:val(ap), color:"#A32D2D", sub:`${apCount}件 未払い`, modal:{ title:"買掛残高（未払い合計）", amount:val(ap), color:"#A32D2D", rows:expenses.filter(e=>e.status==="未払い").map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })), note:`${apCount}件が未払いです。` }},
+
+  const kpis = [
+    { label:"今月売上", v:val(totalSales), raw:totalSales, color:"#0F6E56", sub:"売上合計", modal:{ title:`${selMonth}　売上合計`, amount:val(totalSales), color:"#0F6E56", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"区分":r.type,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
+    { label:"今月経費", v:val(totalExp),   raw:totalExp,   color:"#444",    sub:"経費合計", modal:{ title:`${selMonth}　経費合計`, amount:val(totalExp), formula:`売上原価 ${val(genka)}\n＋ 販管費合計 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
+    { label:"営業利益", v:val(opProfit),   raw:opProfit,   color:"#185FA5", sub:`利益率 ${totalSales?Math.round(opProfit/totalSales*100):0}%`, modal:{ title:"営業利益", amount:val(opProfit), color:"#185FA5", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。" }},
+    { label:"予定経常利益", v:val(netProfit), raw:netProfit, color:netProfit>=0?"#0F6E56":"#A32D2D", sub:`納税${taxRate}%控除後`, modal:{ title:"予定経常利益", amount:val(netProfit), color:"#0F6E56", formula:`営業利益 ${val(opProfit)}\nー 予定納税（${taxRate}%） ${val(taxAmt)}\n＝ 予定経常利益 ${val(netProfit)}` }},
   ];
+
   return (
-    <div style={s.page}>
-      <TopBar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={showOPModal} master={master} />
-      <div style={s.content}>
-        <div style={s.pageHeader}>
-          <div>
-            <div style={s.pageTitle}>ダッシュボード</div>
-            {fiscalLabel && <div style={{ fontSize:12, color:"#aaa", marginTop:2 }}>{selMonth}　{fiscalLabel}</div>}
+    <div style={{ padding:"28px 28px 40px" }}>
+      <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:24 }}>
+        <div>
+          <div style={{ fontSize:22, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>ダッシュボード</div>
+          {fiscalLabel && <div style={{ fontSize:12, color:"#aaa", marginTop:3 }}>{selMonth}　{fiscalLabel}</div>}
+        </div>
+        <div style={{ fontSize:12, color:"#bbb" }}>{master.company.name || "会社名未設定"}</div>
+      </div>
+
+      {/* Month bar */}
+      <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
+
+      {/* KPI cards */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
+        {kpis.map((c,i) => (
+          <div key={i} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"18px 20px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+            <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:10 }}>{c.label}</div>
+            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:26, fontWeight:900, color:c.color, display:"block", marginBottom:6, letterSpacing:-1 }} />
+            <div style={{ fontSize:11, color:"#bbb" }}>{c.sub}</div>
           </div>
-          <div style={{ fontSize:13, color:"#aaa" }}>{master.company.name || "会社名未設定"}</div>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:10, marginBottom:16 }}>
-          {cards.map((c,i) => (
-            <div key={i} style={s.statCard}>
-              <div style={s.statLabel}>{c.label}</div>
-              <N v={c.v} modal={c.modal} setModal={setModal} style={{ color:c.color, fontSize:16, fontWeight:700, display:"block", marginBottom:3 }} />
-              <div style={s.statSub}>{c.sub}</div>
+        ))}
+      </div>
+
+      {/* Chart + AR/AP + Menu */}
+      <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:20 }}>
+        {/* Left: donut + AR/AP */}
+        <div style={{ display:"flex", flexDirection:"column", gap:14, minWidth:260 }}>
+          <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"20px", display:"flex", flexDirection:"column", alignItems:"center", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+            <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:14, alignSelf:"flex-start" }}>売上 vs 経費</div>
+            <DonutChart sales={totalSales} expenses={totalExp} size={200} setModal={setModal} val={val} />
+            <div style={{ display:"flex", gap:20, marginTop:16 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ width:10, height:10, borderRadius:2, background:"#1a6fd4" }} />
+                <span style={{ fontSize:11, color:"#999" }}>売上</span>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ width:10, height:10, borderRadius:2, background:"#FCEBEB" }} />
+                <span style={{ fontSize:11, color:"#999" }}>経費</span>
+              </div>
             </div>
-          ))}
+          </div>
+
+          {/* AR/AP summary */}
+          <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"18px 20px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:6 }}>売掛残高</div>
+              <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between" }}>
+                <N v={val(ar)} modal={{ title:"売掛残高（未入金合計）", amount:val(ar), color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }} setModal={setModal} style={{ fontSize:20, fontWeight:800, color:"#854F0B" }} />
+                <span style={{ fontSize:11, color:"#bbb" }}>{arCount}件未入金</span>
+              </div>
+            </div>
+            <div style={{ height:1, background:"#f2f4f9", margin:"10px 0" }} />
+            <div>
+              <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:6 }}>買掛残高</div>
+              <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between" }}>
+                <N v={val(ap)} modal={{ title:"買掛残高（未払い合計）", amount:val(ap), color:"#A32D2D", rows:expenses.filter(e=>e.status==="未払い").map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })), note:`${apCount}件が未払いです。` }} setModal={setModal} style={{ fontSize:20, fontWeight:800, color:"#A32D2D" }} />
+                <span style={{ fontSize:11, color:"#bbb" }}>{apCount}件未払い</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:12 }}>
+
+        {/* Right: quick actions */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, alignContent:"start" }}>
           {[
             { id:"sales",    icon:"↑", label:"売上入力",   sub:"日次の売上を記録",    bg:"#E1F5EE", ic:"#0F6E56" },
             { id:"expenses", icon:"↓", label:"経費入力",   sub:"経費・支払いを記録",  bg:"#FAECE7", ic:"#993C1D" },
@@ -463,10 +433,10 @@ function HomeScreen({ screen, setScreen, taxMode, setTaxMode, totalSales, totalE
             { id:"cashflow", icon:"⇄", label:"資金繰り",   sub:"キャッシュフロー確認", bg:"#EEEDFE", ic:"#534AB7" },
             { id:"master",   icon:"⚙", label:"マスター",   sub:"会社情報・科目設定",  bg:"#f0f0f0", ic:"#555" },
           ].map(m => (
-            <button key={m.id} style={s.menuCard} onClick={() => setScreen(m.id)}>
-              <div style={{ width:44, height:44, borderRadius:10, background:m.bg, color:m.ic, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:700 }}>{m.icon}</div>
-              <div style={{ fontSize:13, fontWeight:600, color:"#222" }}>{m.label}</div>
-              <div style={{ fontSize:11, color:"#999" }}>{m.sub}</div>
+            <button key={m.id} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"20px 16px", textAlign:"center", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:10, boxShadow:"0 1px 4px rgba(0,0,0,0.04)", transition:"box-shadow 0.15s" }} onClick={() => setScreen(m.id)}>
+              <div style={{ width:48, height:48, borderRadius:12, background:m.bg, color:m.ic, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:700 }}>{m.icon}</div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#222" }}>{m.label}</div>
+              <div style={{ fontSize:11, color:"#aaa" }}>{m.sub}</div>
             </button>
           ))}
         </div>
@@ -476,7 +446,7 @@ function HomeScreen({ screen, setScreen, taxMode, setTaxMode, totalSales, totalE
 }
 
 // ── SALES ─────────────────────────────────────────────────────────────────────
-function SalesScreen({ screen, setScreen, taxMode, setTaxMode, sales, setSales, selMonth, setSelMonth, val, showToast, curSales, setModal, opInvoice, showOPModal, master, fiscalMonths }) {
+function SalesScreen({ setScreen, taxMode, setTaxMode, sales, setSales, selMonth, setSelMonth, val, showToast, curSales, setModal, opInvoice, showOPModal, master, fiscalMonths }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ date:today(), month:selMonth, type:"売掛", client:"", amount:"", tax:10, memo:"", status:"未入金" });
   const [showAlert, setShowAlert] = useState(false);
@@ -496,65 +466,62 @@ function SalesScreen({ screen, setScreen, taxMode, setTaxMode, sales, setSales, 
   const markPaid = (id) => { setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r)); showToast("入金済みにしました"); };
   const total = curSales.reduce((s,r)=>s+r.amount,0);
   return (
-    <div style={s.page}>
-      <TopBar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={showOPModal} master={master} />
-      <div style={s.content}>
-        <div style={s.pageHeader}><div style={s.pageTitle}>売上入力</div><button style={s.btnP} onClick={()=>setShowForm(true)}>＋ 新規入力</button></div>
-        <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
-        {showForm && (
-          <div style={s.formCard}>
-            <div style={s.formTitle}>売上を入力する</div>
-            <div style={s.formGrid}>
-              <FR label="日付"><input type="date" style={s.inp} value={form.date} onChange={e=>sf("date",e.target.value)} /></FR>
-              <FR label="反映月" hint={"この売上は何月の仕事ですか？\n例）3月納品 → 3月　4月に請求しても3月と入力"}>
-                <select style={s.inp} value={form.month} onChange={e=>sf("month",e.target.value)}>{fiscalMonths.map(m=><option key={m}>{m}</option>)}</select>
-              </FR>
-              <FR label="区分"><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","売掛","カード"].map(t=><option key={t}>{t}</option>)}</select></FR>
-              <FR label="相手先">
-                <select style={s.inp} value={form.client} onChange={e=>sf("client",e.target.value)}>
-                  <option value="">選択または直接入力</option>
-                  {clientOptions.map(c=><option key={c}>{c}</option>)}
-                </select>
-              </FR>
-              <FR label="金額（税込）"><input type="number" style={s.inp} value={form.amount} onChange={e=>sf("amount",e.target.value)} onBlur={onAmountBlur} placeholder="110000" /></FR>
-              <FR label="税率"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>10%（標準）</option><option value={8}>8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
-              <FR label="備考"><input style={s.inp} value={form.memo} onChange={e=>sf("memo",e.target.value)} placeholder="Web制作費 5月分など" /></FR>
-            </div>
-            {showAlert && <div style={s.alertBox}>⚠ 先月の平均と大きく異なります。金額を確認してください。<button style={s.alertDis} onClick={()=>setShowAlert(false)}>確認しました</button></div>}
-            <div style={s.formBtns}><button style={s.btnS} onClick={()=>setShowForm(false)}>キャンセル</button><button style={s.btnP} onClick={doSave}>保存する</button></div>
+    <div style={s.screenWrap}>
+      <div style={s.pageHeader}><div style={s.pageTitle}>売上入力</div><button style={s.btnP} onClick={()=>setShowForm(true)}>＋ 新規入力</button></div>
+      <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
+      {showForm && (
+        <div style={s.formCard}>
+          <div style={s.formTitle}>売上を入力する</div>
+          <div style={s.formGrid}>
+            <FR label="日付"><input type="date" style={s.inp} value={form.date} onChange={e=>sf("date",e.target.value)} /></FR>
+            <FR label="反映月" hint={"この売上は何月の仕事ですか？\n例）3月納品 → 3月　4月に請求しても3月と入力"}>
+              <select style={s.inp} value={form.month} onChange={e=>sf("month",e.target.value)}>{fiscalMonths.map(m=><option key={m}>{m}</option>)}</select>
+            </FR>
+            <FR label="区分"><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","売掛","カード"].map(t=><option key={t}>{t}</option>)}</select></FR>
+            <FR label="相手先">
+              <select style={s.inp} value={form.client} onChange={e=>sf("client",e.target.value)}>
+                <option value="">選択または直接入力</option>
+                {clientOptions.map(c=><option key={c}>{c}</option>)}
+              </select>
+            </FR>
+            <FR label="金額（税込）"><input type="number" style={s.inp} value={form.amount} onChange={e=>sf("amount",e.target.value)} onBlur={onAmountBlur} placeholder="110000" /></FR>
+            <FR label="税率"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>10%（標準）</option><option value={8}>8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
+            <FR label="備考"><input style={s.inp} value={form.memo} onChange={e=>sf("memo",e.target.value)} placeholder="Web制作費 5月分など" /></FR>
           </div>
-        )}
-        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:6, gap:6, alignItems:"center" }}>
-          <span style={{ fontSize:12, color:"#aaa" }}>合計</span>
-          <N v={val(total)} setModal={setModal} style={{ fontSize:14, fontWeight:700, color:"#0F6E56" }} modal={{ title:`${selMonth}　売上合計`, amount:val(total), color:"#0F6E56", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"区分":r.type,"金額":val(r.amount),"状態":r.status })) }} />
+          {showAlert && <div style={s.alertBox}>⚠ 先月の平均と大きく異なります。金額を確認してください。<button style={s.alertDis} onClick={()=>setShowAlert(false)}>確認しました</button></div>}
+          <div style={s.formBtns}><button style={s.btnS} onClick={()=>setShowForm(false)}>キャンセル</button><button style={s.btnP} onClick={doSave}>保存する</button></div>
         </div>
-        <div style={s.tblWrap}>
-          <table style={s.tbl}>
-            <thead><tr>{["日付","反映月","相手先","区分","金額","税率","備考","状態",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
-            <tbody>
-              {curSales.length===0 ? <tr><td colSpan={9} style={{ ...s.td, textAlign:"center", color:"#bbb", padding:32 }}>まだ売上データがありません</td></tr>
-              : curSales.map(r=>(
-                <tr key={r.id} style={s.tr}>
-                  <td style={s.td}>{r.date}</td><td style={s.td}>{r.month}</td>
-                  <td style={{ ...s.td, fontWeight:500 }}>{r.client}</td>
-                  <td style={s.td}><span style={{ ...s.badge, ...(r.type==="売掛"?s.bAmber:s.bGreen) }}>{r.type}</span></td>
-                  <td style={{ ...s.td, textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700, color:"#0F6E56" }} modal={{ title:`${r.client}への売上`, amount:val(r.amount), color:"#0F6E56", formula:`税込 ${fmt(r.amount)}${r.tax>0?`\n（税抜 ${fmtEx(r.amount)}）`:""}`, rows:[{ "相手先":r.client,"日付":r.date,"反映月":r.month,"区分":r.type,"備考":r.memo||"—","状態":r.status }] }} /></td>
-                  <td style={{ ...s.td, textAlign:"center" }}>{r.tax}%</td>
-                  <td style={{ ...s.td, color:"#aaa" }}>{r.memo}</td>
-                  <td style={s.td}><span style={{ ...s.badge, ...(r.status==="入金済"?s.bGreen:s.bAmber) }}>{r.status}</span></td>
-                  <td style={s.td}>{r.status==="未入金"&&<button style={s.paidBtn} onClick={()=>markPaid(r.id)}>入金済</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      )}
+      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:8, gap:6, alignItems:"center" }}>
+        <span style={{ fontSize:12, color:"#aaa" }}>合計</span>
+        <N v={val(total)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#0F6E56" }} modal={{ title:`${selMonth}　売上合計`, amount:val(total), color:"#0F6E56", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"区分":r.type,"金額":val(r.amount),"状態":r.status })) }} />
+      </div>
+      <div style={s.tblWrap}>
+        <table style={s.tbl}>
+          <thead><tr>{["日付","反映月","相手先","区分","金額","税率","備考","状態",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {curSales.length===0 ? <tr><td colSpan={9} style={{ ...s.td, textAlign:"center", color:"#bbb", padding:32 }}>まだ売上データがありません</td></tr>
+            : curSales.map(r=>(
+              <tr key={r.id} style={s.tr}>
+                <td style={s.td}>{r.date}</td><td style={s.td}>{r.month}</td>
+                <td style={{ ...s.td, fontWeight:500 }}>{r.client}</td>
+                <td style={s.td}><span style={{ ...s.badge, ...(r.type==="売掛"?s.bAmber:s.bGreen) }}>{r.type}</span></td>
+                <td style={{ ...s.td, textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700, color:"#0F6E56" }} modal={{ title:`${r.client}への売上`, amount:val(r.amount), color:"#0F6E56", formula:`税込 ${fmt(r.amount)}${r.tax>0?`\n（税抜 ${fmtEx(r.amount)}）`:""}`, rows:[{ "相手先":r.client,"日付":r.date,"反映月":r.month,"区分":r.type,"備考":r.memo||"—","状態":r.status }] }} /></td>
+                <td style={{ ...s.td, textAlign:"center" }}>{r.tax}%</td>
+                <td style={{ ...s.td, color:"#aaa" }}>{r.memo}</td>
+                <td style={s.td}><span style={{ ...s.badge, ...(r.status==="入金済"?s.bGreen:s.bAmber) }}>{r.status}</span></td>
+                <td style={s.td}>{r.status==="未入金"&&<button style={s.paidBtn} onClick={()=>markPaid(r.id)}>入金済</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
 // ── EXPENSES ──────────────────────────────────────────────────────────────────
-function ExpenseScreen({ screen, setScreen, taxMode, setTaxMode, expenses, setExpenses, selMonth, setSelMonth, val, showToast, curExp, setModal, opInvoice, showOPModal, master, fiscalMonths }) {
+function ExpenseScreen({ expenses, setExpenses, selMonth, setSelMonth, val, showToast, curExp, setModal, master, fiscalMonths }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ date:today(), month:selMonth, type:"現金", client:"", account:"", amount:"", tax:10, memo:"", status:"未払い" });
   const [freeText, setFreeText] = useState("");
@@ -578,77 +545,72 @@ function ExpenseScreen({ screen, setScreen, taxMode, setTaxMode, expenses, setEx
   const total = curExp.reduce((s,r)=>s+r.amount,0);
   const accountOptions = master.accounts.filter(a=>a.category!=="revenue");
   return (
-    <div style={s.page}>
-      <TopBar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={showOPModal} master={master} />
-      <div style={s.content}>
-        <div style={s.pageHeader}><div style={s.pageTitle}>経費入力</div><button style={s.btnP} onClick={()=>setShowForm(true)}>＋ 新規入力</button></div>
-        <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
-        {showForm && (
-          <div style={s.formCard}>
-            <div style={s.formTitle}>経費を入力する</div>
-            <div style={s.formGrid}>
-              <FR label="日付"><input type="date" style={s.inp} value={form.date} onChange={e=>sf("date",e.target.value)} /></FR>
-              <FR label="反映月" hint={"この経費は何月分ですか？\n例）4月の家賃を5月に払う場合 → 4月と入力"}>
-                <select style={s.inp} value={form.month} onChange={e=>sf("month",e.target.value)}>{fiscalMonths.map(m=><option key={m}>{m}</option>)}</select>
-              </FR>
-              <FR label="何に使いましたか？" hint="入力すると勘定科目を自動提案します">
-                <div>
-                  <input style={s.inp} value={freeText} onChange={e=>onFree(e.target.value)} placeholder="例：電車代、接待ランチ、Adobe代など" />
-                  {suggestion && <div style={s.aiSug}>✦ AIの提案：<strong>{suggestion}</strong> に分類しました</div>}
-                </div>
-              </FR>
-              <FR label="勘定科目">
-                <select style={s.inp} value={form.account} onChange={e=>sf("account",e.target.value)}>
-                  <option value="">選択してください</option>
-                  {accountOptions.map(a=><option key={a.id} value={a.label}>{a.label}（例：{a.examples.split("、")[0]}）</option>)}
-                </select>
-              </FR>
-              <FR label="区分"><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t}>{t}</option>)}</select></FR>
-              <FR label="相手先"><input style={s.inp} value={form.client} onChange={e=>sf("client",e.target.value)} placeholder="〇〇ビルなど" /></FR>
-              <FR label="金額（税込）"><input type="number" style={s.inp} value={form.amount} onChange={e=>sf("amount",e.target.value)} onBlur={onAmountBlur} placeholder="50000" /></FR>
-              <FR label="税率"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>10%（標準）</option><option value={8}>8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
-            </div>
-            {showAlert && <div style={s.alertBox}>⚠ 先月の平均と大きく異なります。金額を確認してください。<button style={s.alertDis} onClick={()=>setShowAlert(false)}>確認しました</button></div>}
-            <div style={s.formBtns}><button style={s.btnS} onClick={()=>setShowForm(false)}>キャンセル</button><button style={s.btnP} onClick={doSave}>保存する</button></div>
+    <div style={s.screenWrap}>
+      <div style={s.pageHeader}><div style={s.pageTitle}>経費入力</div><button style={s.btnP} onClick={()=>setShowForm(true)}>＋ 新規入力</button></div>
+      <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
+      {showForm && (
+        <div style={s.formCard}>
+          <div style={s.formTitle}>経費を入力する</div>
+          <div style={s.formGrid}>
+            <FR label="日付"><input type="date" style={s.inp} value={form.date} onChange={e=>sf("date",e.target.value)} /></FR>
+            <FR label="反映月" hint={"この経費は何月分ですか？\n例）4月の家賃を5月に払う場合 → 4月と入力"}>
+              <select style={s.inp} value={form.month} onChange={e=>sf("month",e.target.value)}>{fiscalMonths.map(m=><option key={m}>{m}</option>)}</select>
+            </FR>
+            <FR label="何に使いましたか？" hint="入力すると勘定科目を自動提案します">
+              <div>
+                <input style={s.inp} value={freeText} onChange={e=>onFree(e.target.value)} placeholder="例：電車代、接待ランチ、Adobe代など" />
+                {suggestion && <div style={s.aiSug}>✦ AIの提案：<strong>{suggestion}</strong> に分類しました</div>}
+              </div>
+            </FR>
+            <FR label="勘定科目">
+              <select style={s.inp} value={form.account} onChange={e=>sf("account",e.target.value)}>
+                <option value="">選択してください</option>
+                {accountOptions.map(a=><option key={a.id} value={a.label}>{a.label}（例：{a.examples.split("、")[0]}）</option>)}
+              </select>
+            </FR>
+            <FR label="区分"><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t}>{t}</option>)}</select></FR>
+            <FR label="相手先"><input style={s.inp} value={form.client} onChange={e=>sf("client",e.target.value)} placeholder="〇〇ビルなど" /></FR>
+            <FR label="金額（税込）"><input type="number" style={s.inp} value={form.amount} onChange={e=>sf("amount",e.target.value)} onBlur={onAmountBlur} placeholder="50000" /></FR>
+            <FR label="税率"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>10%（標準）</option><option value={8}>8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
           </div>
-        )}
-        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:6, gap:6, alignItems:"center" }}>
-          <span style={{ fontSize:12, color:"#aaa" }}>合計</span>
-          <N v={val(total)} setModal={setModal} style={{ fontSize:14, fontWeight:700, color:"#A32D2D" }} modal={{ title:`${selMonth}　経費合計`, amount:val(total), color:"#A32D2D", rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount),"状態":r.status })) }} />
+          {showAlert && <div style={s.alertBox}>⚠ 先月の平均と大きく異なります。金額を確認してください。<button style={s.alertDis} onClick={()=>setShowAlert(false)}>確認しました</button></div>}
+          <div style={s.formBtns}><button style={s.btnS} onClick={()=>setShowForm(false)}>キャンセル</button><button style={s.btnP} onClick={doSave}>保存する</button></div>
         </div>
-        <div style={s.tblWrap}>
-          <table style={s.tbl}>
-            <thead><tr>{["日付","反映月","相手先","勘定科目","区分","金額","備考","状態",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
-            <tbody>
-              {curExp.length===0 ? <tr><td colSpan={9} style={{ ...s.td, textAlign:"center", color:"#bbb", padding:32 }}>まだ経費データがありません</td></tr>
-              : curExp.map(r=>(
-                <tr key={r.id} style={s.tr}>
-                  <td style={s.td}>{r.date}</td><td style={s.td}>{r.month}</td>
-                  <td style={{ ...s.td, fontWeight:500 }}>{r.client}</td>
-                  <td style={{ ...s.td, color:"#666" }}>{r.account}</td>
-                  <td style={s.td}><span style={{ ...s.badge, ...(r.type==="買掛"?s.bRed:s.bGreen) }}>{r.type}</span></td>
-                  <td style={{ ...s.td, textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700 }} modal={{ title:`${r.client} / ${r.account}`, amount:val(r.amount), formula:`税込 ${fmt(r.amount)}\n勘定科目：${r.account}\n区分：${r.type}`, rows:[{ "相手先":r.client,"日付":r.date,"反映月":r.month,"科目":r.account,"備考":r.memo||"—","状態":r.status }] }} /></td>
-                  <td style={{ ...s.td, color:"#aaa" }}>{r.memo}</td>
-                  <td style={s.td}><span style={{ ...s.badge, ...(r.status==="支払済"?s.bGreen:s.bRed) }}>{r.status}</span></td>
-                  <td style={s.td}>{r.status==="未払い"&&<button style={{ ...s.paidBtn, borderColor:"#f09595", color:"#A32D2D" }} onClick={()=>markPaid(r.id)}>支払済</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      )}
+      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:8, gap:6, alignItems:"center" }}>
+        <span style={{ fontSize:12, color:"#aaa" }}>合計</span>
+        <N v={val(total)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#A32D2D" }} modal={{ title:`${selMonth}　経費合計`, amount:val(total), color:"#A32D2D", rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount),"状態":r.status })) }} />
+      </div>
+      <div style={s.tblWrap}>
+        <table style={s.tbl}>
+          <thead><tr>{["日付","反映月","相手先","勘定科目","区分","金額","備考","状態",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {curExp.length===0 ? <tr><td colSpan={9} style={{ ...s.td, textAlign:"center", color:"#bbb", padding:32 }}>まだ経費データがありません</td></tr>
+            : curExp.map(r=>(
+              <tr key={r.id} style={s.tr}>
+                <td style={s.td}>{r.date}</td><td style={s.td}>{r.month}</td>
+                <td style={{ ...s.td, fontWeight:500 }}>{r.client}</td>
+                <td style={{ ...s.td, color:"#666" }}>{r.account}</td>
+                <td style={s.td}><span style={{ ...s.badge, ...(r.type==="買掛"?s.bRed:s.bGreen) }}>{r.type}</span></td>
+                <td style={{ ...s.td, textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700 }} modal={{ title:`${r.client} / ${r.account}`, amount:val(r.amount), formula:`税込 ${fmt(r.amount)}\n勘定科目：${r.account}\n区分：${r.type}`, rows:[{ "相手先":r.client,"日付":r.date,"反映月":r.month,"科目":r.account,"備考":r.memo||"—","状態":r.status }] }} /></td>
+                <td style={{ ...s.td, color:"#aaa" }}>{r.memo}</td>
+                <td style={s.td}><span style={{ ...s.badge, ...(r.status==="支払済"?s.bGreen:s.bRed) }}>{r.status}</span></td>
+                <td style={s.td}>{r.status==="未払い"&&<button style={{ ...s.paidBtn, borderColor:"#f09595", color:"#A32D2D" }} onClick={()=>markPaid(r.id)}>支払済</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
 // ── PL ────────────────────────────────────────────────────────────────────────
-function PLScreen({ screen, setScreen, taxMode, setTaxMode, selMonth, setSelMonth, val, totalSales, genka, grossProfit, sga, opProfit, taxAmt, netProfit, curSales, curExp, setModal, opInvoice, showOPModal, master, fiscalMonths, sales, expenses, taxRate }) {
-  const [viewMode, setViewMode] = useState("monthly"); // monthly | annual
-  const sgaRows = master.accounts.filter(a=>a.category==="sga").map(a=>({ label:a.label, amount:curExp.filter(e=>e.account===a.label).reduce((s,r)=>s+r.amount,0) })).filter(a=>a.amount>0);
+function PLScreen({ selMonth, setSelMonth, val, totalSales, genka, grossProfit, sga, opProfit, taxAmt, netProfit, curSales, curExp, setModal, master, fiscalMonths, sales, expenses, taxRate }) {
+  const [viewMode, setViewMode] = useState("monthly");
   const fiscalNum = master.company.fiscalNum || 1;
   const fiscalIdx = fiscalMonths.indexOf(selMonth);
 
-  // 年間集計
   const annualSales = fiscalMonths.reduce((s,m)=>s+sales.filter(r=>r.month===m).reduce((a,r)=>a+r.amount,0),0);
   const annualExp   = fiscalMonths.reduce((s,m)=>s+expenses.filter(r=>r.month===m).reduce((a,r)=>a+r.amount,0),0);
   const annualGenka = fiscalMonths.reduce((s,m)=>s+expenses.filter(r=>r.month===m&&r.account==="売上原価").reduce((a,r)=>a+r.amount,0),0);
@@ -679,86 +641,79 @@ function PLScreen({ screen, setScreen, taxMode, setTaxMode, selMonth, setSelMont
   const rows = viewMode==="annual" ? annualRows : monthlyRows;
 
   return (
-    <div style={s.page}>
-      <TopBar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={showOPModal} master={master} />
-      <div style={s.content}>
-        <div style={s.pageHeader}>
-          <div>
-            <div style={s.pageTitle}>損益計算書</div>
-            <div style={{ fontSize:12, color:"#aaa", marginTop:2 }}>第{fiscalNum}期　{fiscalMonths[0]}〜{fiscalMonths[11]}</div>
-          </div>
-          <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-            <div style={s.taxSwitch}>
-              <button style={{ ...s.taxBtn, ...(viewMode==="monthly"?s.taxActive:{}) }} onClick={()=>setViewMode("monthly")}>月次</button>
-              <button style={{ ...s.taxBtn, ...(viewMode==="annual"?s.taxActive:{}) }} onClick={()=>setViewMode("annual")}>年間累計</button>
-            </div>
-            <button style={s.btnS}>CSV出力</button>
-          </div>
+    <div style={s.screenWrap}>
+      <div style={s.pageHeader}>
+        <div>
+          <div style={s.pageTitle}>損益計算書</div>
+          <div style={{ fontSize:12, color:"#aaa", marginTop:2 }}>第{fiscalNum}期　{fiscalMonths[0]}〜{fiscalMonths[11]}</div>
         </div>
-        {viewMode==="monthly" && <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />}
-        <div style={s.plWrap}>
-          <div style={s.plHdr}>
-            <span>{viewMode==="annual" ? `第${fiscalNum}期　年間累計` : `${selMonth}　${fiscalIdx>=0?`第${fiscalNum}期 ${fiscalIdx+1}ヶ月目`:""}`}</span>
-            <span style={{ fontSize:12, color:"#aaa" }}>（{taxMode==="inc"?"税込":"税抜"}）</span>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <div style={s.taxSwitch}>
+            <button style={{ ...s.taxBtn, ...(viewMode==="monthly"?s.taxActive:{}) }} onClick={()=>setViewMode("monthly")}>月次</button>
+            <button style={{ ...s.taxBtn, ...(viewMode==="annual"?s.taxActive:{}) }} onClick={()=>setViewMode("annual")}>年間累計</button>
           </div>
-          {rows.map((r,i) => (
-            <div key={i} style={{ ...s.plRow, background:r.hl?(r.big?"#E6F1FB":"#f0f6ff"):i%2===0?"#fff":"#fafafa", borderTop:r.hl?"1px solid #c5d8f5":undefined }}>
-              <span style={{ paddingLeft:r.lv*24, fontSize:r.big?15:13, fontWeight:r.bold?600:400, color:r.color||(r.lv===1?"#777":"#222") }}>
-                {r.lv===1&&<span style={{ marginRight:6, color:"#ddd" }}>└</span>}{r.label}
-              </span>
-              <N v={(r.label.includes("予定納税")?"▲":"")+val(r.v)} setModal={setModal} modal={{ title:r.label, amount:val(r.v), color:r.color }} style={{ fontSize:r.big?16:13, fontWeight:r.bold?700:500, color:r.color||"#222" }} />
-            </div>
-          ))}
+          <button style={s.btnS}>CSV出力</button>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
-          {[
-            { l:"粗利率",     v:(viewMode==="annual"?annualSales:totalSales)?Math.round((viewMode==="annual"?annualGross:grossProfit)/(viewMode==="annual"?annualSales:totalSales)*100)+"%":"—", c:"#185FA5" },
-            { l:"営業利益率", v:(viewMode==="annual"?annualSales:totalSales)?Math.round((viewMode==="annual"?annualOp:opProfit)/(viewMode==="annual"?annualSales:totalSales)*100)+"%":"—", c:"#0F6E56" },
-            { l:"経常利益率", v:(viewMode==="annual"?annualSales:totalSales)?Math.round((viewMode==="annual"?annualNet:netProfit)/(viewMode==="annual"?annualSales:totalSales)*100)+"%":"—", c:"#0F6E56" },
-          ].map((c,i) => <div key={i} style={s.statCard}><div style={s.statLabel}>{c.l}</div><div style={{ fontSize:20, fontWeight:700, color:c.c }}>{c.v}</div></div>)}
+      </div>
+      {viewMode==="monthly" && <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />}
+      <div style={s.plWrap}>
+        <div style={s.plHdr}>
+          <span>{viewMode==="annual" ? `第${fiscalNum}期　年間累計` : `${selMonth}　${fiscalIdx>=0?`第${fiscalNum}期 ${fiscalIdx+1}ヶ月目`:""}`}</span>
         </div>
+        {rows.map((r,i) => (
+          <div key={i} style={{ ...s.plRow, background:r.hl?(r.big?"#E6F1FB":"#f0f6ff"):i%2===0?"#fff":"#fafafa", borderTop:r.hl?"1px solid #c5d8f5":undefined }}>
+            <span style={{ paddingLeft:r.lv*24, fontSize:r.big?15:13, fontWeight:r.bold?600:400, color:r.color||(r.lv===1?"#777":"#222") }}>
+              {r.lv===1&&<span style={{ marginRight:6, color:"#ddd" }}>└</span>}{r.label}
+            </span>
+            <N v={(r.label.includes("予定納税")?"▲":"")+val(r.v)} setModal={setModal} modal={{ title:r.label, amount:val(r.v), color:r.color }} style={{ fontSize:r.big?18:14, fontWeight:r.bold?800:500, color:r.color||"#222" }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
+        {[
+          { l:"粗利率",     v:(viewMode==="annual"?annualSales:totalSales)?Math.round((viewMode==="annual"?annualGross:grossProfit)/(viewMode==="annual"?annualSales:totalSales)*100)+"%":"—", c:"#185FA5" },
+          { l:"営業利益率", v:(viewMode==="annual"?annualSales:totalSales)?Math.round((viewMode==="annual"?annualOp:opProfit)/(viewMode==="annual"?annualSales:totalSales)*100)+"%":"—", c:"#0F6E56" },
+          { l:"経常利益率", v:(viewMode==="annual"?annualSales:totalSales)?Math.round((viewMode==="annual"?annualNet:netProfit)/(viewMode==="annual"?annualSales:totalSales)*100)+"%":"—", c:"#0F6E56" },
+        ].map((c,i) => <div key={i} style={s.statCard}><div style={s.statLabel}>{c.l}</div><div style={{ fontSize:24, fontWeight:800, color:c.c }}>{c.v}</div></div>)}
       </div>
     </div>
   );
 }
 
 // ── AR/AP ─────────────────────────────────────────────────────────────────────
-function ARScreen({ screen, setScreen, taxMode, setTaxMode, sales, setSales, expenses, setExpenses, val, showToast, setModal, opInvoice, showOPModal, master }) {
+function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setModal }) {
   const unpS=sales.filter(s=>s.status==="未入金"), paidS=sales.filter(s=>s.status==="入金済");
   const unpE=expenses.filter(e=>e.status==="未払い"), paidE=expenses.filter(e=>e.status==="支払済");
   const arT=unpS.reduce((s,r)=>s+r.amount,0), apT=unpE.reduce((s,r)=>s+r.amount,0);
   const mS=(id)=>{setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r));showToast("入金済みにしました");};
   const mE=(id)=>{setExpenses(p=>p.map(e=>e.id===id?{...e,status:"支払済"}:e));showToast("支払済みにしました");};
   return (
-    <div style={s.page}>
-      <TopBar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={showOPModal} master={master} />
-      <div style={s.content}>
-        <div style={s.pageHeader}><div style={s.pageTitle}>売掛・買掛管理</div></div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-          <div>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-              <div style={s.secTitle}>売掛（未入金）</div>
-              <N v={val(arT)} setModal={setModal} style={{ fontSize:14, fontWeight:700, color:"#854F0B" }} modal={{ title:"売掛残高", amount:val(arT), color:"#854F0B", rows:unpS.map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })) }} />
-            </div>
-            <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額","区分",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
-              {unpS.length===0?<tr><td colSpan={4} style={{ ...s.td,textAlign:"center",color:"#bbb",padding:20 }}>✓ 未入金なし</td></tr>
-              :unpS.map(r=><tr key={r.id} style={s.tr}><td style={{ ...s.td,fontWeight:500 }}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700,color:"#854F0B" }} modal={{ title:`${r.client}　未入金`,amount:val(r.amount),color:"#854F0B",rows:[{ "相手先":r.client,"反映月":r.month,"区分":r.type,"備考":r.memo||"—" }],note:"「入金された」ボタンで消込できます。" }} /></td><td style={s.td}><span style={{ ...s.badge,...s.bAmber }}>{r.type}</span></td><td style={s.td}><button style={s.paidBtn} onClick={()=>mS(r.id)}>入金済</button></td></tr>)}
-            </tbody></table></div>
-            <div style={s.secTitleSub}>入金済（消込済）</div>
-            <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidS.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td><td style={s.td}><span style={{ ...s.badge,...s.bGreen }}>✓ 入金済</span></td></tr>)}</tbody></table></div>
+    <div style={s.screenWrap}>
+      <div style={s.pageHeader}><div style={s.pageTitle}>売掛・買掛管理</div></div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+            <div style={s.secTitle}>売掛（未入金）</div>
+            <N v={val(arT)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#854F0B" }} modal={{ title:"売掛残高", amount:val(arT), color:"#854F0B", rows:unpS.map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })) }} />
           </div>
-          <div>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-              <div style={{ ...s.secTitle,color:"#A32D2D" }}>買掛（未払い）</div>
-              <N v={val(apT)} setModal={setModal} style={{ fontSize:14, fontWeight:700, color:"#A32D2D" }} modal={{ title:"買掛残高", amount:val(apT), color:"#A32D2D", rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }} />
-            </div>
-            <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
-              {unpE.length===0?<tr><td colSpan={4} style={{ ...s.td,textAlign:"center",color:"#bbb",padding:20 }}>✓ 未払いなし</td></tr>
-              :unpE.map(r=><tr key={r.id} style={s.tr}><td style={{ ...s.td,fontWeight:500 }}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700,color:"#A32D2D" }} modal={{ title:`${r.client}　未払い`,amount:val(r.amount),color:"#A32D2D",rows:[{ "相手先":r.client,"科目":r.account,"備考":r.memo||"—" }],note:"「支払った」ボタンで消込できます。" }} /></td><td style={s.td}><button style={{ ...s.paidBtn,borderColor:"#f09595",color:"#A32D2D" }} onClick={()=>mE(r.id)}>支払済</button></td></tr>)}
-            </tbody></table></div>
-            <div style={s.secTitleSub}>支払済（消込済）</div>
-            <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額"].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidE.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td></tr>)}</tbody></table></div>
+          <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額","区分",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
+            {unpS.length===0?<tr><td colSpan={4} style={{ ...s.td,textAlign:"center",color:"#bbb",padding:20 }}>✓ 未入金なし</td></tr>
+            :unpS.map(r=><tr key={r.id} style={s.tr}><td style={{ ...s.td,fontWeight:500 }}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700,color:"#854F0B" }} modal={{ title:`${r.client}　未入金`,amount:val(r.amount),color:"#854F0B",rows:[{ "相手先":r.client,"反映月":r.month,"区分":r.type,"備考":r.memo||"—" }],note:"「入金済」ボタンで消込できます。" }} /></td><td style={s.td}><span style={{ ...s.badge,...s.bAmber }}>{r.type}</span></td><td style={s.td}><button style={s.paidBtn} onClick={()=>mS(r.id)}>入金済</button></td></tr>)}
+          </tbody></table></div>
+          <div style={s.secTitleSub}>入金済（消込済）</div>
+          <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidS.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td><td style={s.td}><span style={{ ...s.badge,...s.bGreen }}>✓ 入金済</span></td></tr>)}</tbody></table></div>
+        </div>
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+            <div style={{ ...s.secTitle,color:"#A32D2D" }}>買掛（未払い）</div>
+            <N v={val(apT)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#A32D2D" }} modal={{ title:"買掛残高", amount:val(apT), color:"#A32D2D", rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }} />
           </div>
+          <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
+            {unpE.length===0?<tr><td colSpan={4} style={{ ...s.td,textAlign:"center",color:"#bbb",padding:20 }}>✓ 未払いなし</td></tr>
+            :unpE.map(r=><tr key={r.id} style={s.tr}><td style={{ ...s.td,fontWeight:500 }}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700,color:"#A32D2D" }} modal={{ title:`${r.client}　未払い`,amount:val(r.amount),color:"#A32D2D",rows:[{ "相手先":r.client,"科目":r.account,"備考":r.memo||"—" }],note:"「支払済」ボタンで消込できます。" }} /></td><td style={s.td}><button style={{ ...s.paidBtn,borderColor:"#f09595",color:"#A32D2D" }} onClick={()=>mE(r.id)}>支払済</button></td></tr>)}
+          </tbody></table></div>
+          <div style={s.secTitleSub}>支払済（消込済）</div>
+          <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額"].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidE.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td></tr>)}</tbody></table></div>
         </div>
       </div>
     </div>
@@ -766,7 +721,7 @@ function ARScreen({ screen, setScreen, taxMode, setTaxMode, sales, setSales, exp
 }
 
 // ── CASHFLOW ──────────────────────────────────────────────────────────────────
-function CashflowScreen({ screen, setScreen, taxMode, setTaxMode, val, sales, expenses, setModal, opInvoice, showOPModal, master, fiscalMonths }) {
+function CashflowScreen({ val, sales, expenses, setModal, fiscalMonths }) {
   const ms6 = fiscalMonths.slice(0,6);
   const dIn  = ms6.map(m=>sales.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
   const dOut = ms6.map(m=>expenses.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
@@ -781,38 +736,35 @@ function CashflowScreen({ screen, setScreen, taxMode, setTaxMode, val, sales, ex
     { label:"月末残高", vals:bal,  color:"#185FA5",bold:true,hl:true,mk:mkBal },
   ];
   return (
-    <div style={s.page}>
-      <TopBar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={showOPModal} master={master} />
-      <div style={s.content}>
-        <div style={s.pageHeader}><div style={s.pageTitle}>資金繰り表</div><button style={s.btnS}>CSV出力</button></div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:16 }}>
-          {[
-            { l:"最新月末残高", v:bal[bal.length-1]||0, c:"#0F6E56", mo:mkBal(ms6.length-1) },
-            { l:"直近入金合計", v:dIn[dIn.length-1]||0, c:"#185FA5", mo:mkIn(ms6.length-1) },
-            { l:"直近支払合計", v:dOut[dOut.length-1]||0, c:"#333", mo:mkOut(ms6.length-1) },
-            { l:"直近当月収支", v:(dIn[dIn.length-1]||0)-(dOut[dOut.length-1]||0), c:"#0F6E56", mo:mkBal(ms6.length-1) },
-          ].map((c,i)=><div key={i} style={s.statCard}><div style={s.statLabel}>{c.l}</div><N v={val(c.v)} setModal={setModal} modal={c.mo} style={{ color:c.c,fontSize:16,fontWeight:700,display:"block",marginTop:2 }} /></div>)}
-        </div>
-        <div style={s.tblWrap}>
-          <table style={s.tbl}>
-            <thead><tr><th style={{ ...s.th,textAlign:"left",width:140 }}>項目</th>{ms6.map(m=><th key={m} style={s.th}>{m}</th>)}</tr></thead>
-            <tbody>
-              {tRows.map((row,ri)=>(
-                <tr key={ri} style={{ background:row.hl?"#E6F1FB":ri%2===0?"#fff":"#fafafa" }}>
-                  <td style={{ ...s.td,textAlign:"left",fontWeight:row.bold?600:400,color:row.color||"#333",fontSize:12 }}>{row.label}</td>
-                  {row.vals.map((v,ci)=><td key={ci} style={{ ...s.td,textAlign:"right",fontSize:12 }}><N v={val(v)} setModal={setModal} modal={row.mk(ci)} style={{ fontWeight:row.bold?700:500,color:row.hl?"#185FA5":row.color||"#333" }} /></td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+    <div style={s.screenWrap}>
+      <div style={s.pageHeader}><div style={s.pageTitle}>資金繰り表</div><button style={s.btnS}>CSV出力</button></div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:16 }}>
+        {[
+          { l:"最新月末残高", v:bal[bal.length-1]||0, c:"#0F6E56", mo:mkBal(ms6.length-1) },
+          { l:"直近入金合計", v:dIn[dIn.length-1]||0, c:"#185FA5", mo:mkIn(ms6.length-1) },
+          { l:"直近支払合計", v:dOut[dOut.length-1]||0, c:"#333", mo:mkOut(ms6.length-1) },
+          { l:"直近当月収支", v:(dIn[dIn.length-1]||0)-(dOut[dOut.length-1]||0), c:"#0F6E56", mo:mkBal(ms6.length-1) },
+        ].map((c,i)=><div key={i} style={s.statCard}><div style={s.statLabel}>{c.l}</div><N v={val(c.v)} setModal={setModal} modal={c.mo} style={{ color:c.c,fontSize:20,fontWeight:800,display:"block",marginTop:4 }} /></div>)}
+      </div>
+      <div style={s.tblWrap}>
+        <table style={s.tbl}>
+          <thead><tr><th style={{ ...s.th,textAlign:"left",width:140 }}>項目</th>{ms6.map(m=><th key={m} style={s.th}>{m}</th>)}</tr></thead>
+          <tbody>
+            {tRows.map((row,ri)=>(
+              <tr key={ri} style={{ background:row.hl?"#E6F1FB":ri%2===0?"#fff":"#fafafa" }}>
+                <td style={{ ...s.td,textAlign:"left",fontWeight:row.bold?600:400,color:row.color||"#333",fontSize:12 }}>{row.label}</td>
+                {row.vals.map((v,ci)=><td key={ci} style={{ ...s.td,textAlign:"right",fontSize:12 }}><N v={val(v)} setModal={setModal} modal={row.mk(ci)} style={{ fontWeight:row.bold?700:500,color:row.hl?"#185FA5":row.color||"#333" }} /></td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
 // ── INVOICE SCREEN ────────────────────────────────────────────────────────────
-function InvoiceScreen({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master, sales, setSales, showToast, setModal, val }) {
+function InvoiceScreen({ screen, setScreen, opInvoice, showOPModal, master, sales, setSales, showToast, setModal, val }) {
   const companies = [
     { id:"a", name: master.company.name||"自社", addr:master.company.addr||"", bank:`${master.company.bankName||""} ${master.company.bankBranch||""} ${master.company.bankType||""} ${master.company.bankNo||""}`, stamp:(master.company.name||"自")[0] },
   ];
@@ -838,118 +790,256 @@ function InvoiceScreen({ screen, setScreen, taxMode, setTaxMode, opInvoice, show
   };
   const doReset=()=>{ setStep(1);setCompleted(false);setForm({ client:"",issueDate:today(),dueDate:"",subject:"" });setItems([{ desc:"",qty:1,unit:"式",price:0 }]); };
   return (
-    <div style={s.page}>
-      <TopBar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={showOPModal} master={master} />
-      <div style={s.content}>
-        <div style={s.pageHeader}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={s.pageTitle}>請求書作成</div>
-            <span style={{ fontSize:11, fontWeight:700, color:"#1a6fd4", background:"#E6F1FB", borderRadius:10, padding:"2px 10px" }}>✦ OP</span>
-          </div>
-          {!completed&&<div style={{ display:"flex", gap:8, alignItems:"center" }}>{[1,2,3].map(n=><div key={n} style={{ display:"flex",alignItems:"center",gap:4 }}><div style={{ width:24,height:24,borderRadius:12,background:step>=n?"#1a6fd4":"#e8ecf3",color:step>=n?"#fff":"#aaa",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>{n}</div><span style={{ fontSize:11,color:step===n?"#1a6fd4":"#bbb",fontWeight:step===n?700:400 }}>{["会社・基本情報","明細入力","プレビュー"][n-1]}</span>{n<3&&<span style={{ color:"#ddd",margin:"0 2px" }}>›</span>}</div>)}</div>}
+    <div style={s.screenWrap}>
+      <div style={s.pageHeader}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={s.pageTitle}>請求書作成</div>
+          <span style={{ fontSize:11, fontWeight:700, color:"#1a6fd4", background:"#E6F1FB", borderRadius:10, padding:"2px 10px" }}>✦ OP</span>
         </div>
-        {completed ? (
-          <div style={{ maxWidth:480,margin:"40px auto",textAlign:"center" }}>
-            <div style={{ width:72,height:72,borderRadius:36,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",fontSize:36 }}>✓</div>
-            <div style={{ fontSize:20,fontWeight:700,marginBottom:8 }}>請求書を発行しました</div>
-            <div style={{ fontSize:13,color:"#888",marginBottom:24,lineHeight:1.8 }}>{invNum}　{fmt(total)}<br/>{form.client} 宛</div>
-            <div style={{ background:"#f7f9fc",borderRadius:12,padding:"16px 20px",marginBottom:20,textAlign:"left" }}>
-              <div style={{ fontSize:11,color:"#aaa",marginBottom:10,fontWeight:600 }}>自動反映済み</div>
-              {[["✓","売上入力シートに追加"],["✓","売掛管理に追加（未入金）"],["✓","損益計算書に反映"]].map(([ic,t],i)=><div key={i} style={{ display:"flex",alignItems:"center",gap:10,marginBottom:8 }}><span style={{ color:"#3B6D11",fontWeight:700 }}>{ic}</span><span style={{ fontSize:13,color:"#555" }}>{t}</span></div>)}
-            </div>
-            <div style={{ display:"flex",gap:10 }}>
-              <button style={{ flex:1,padding:"11px",borderRadius:8,border:"1px solid #dce3f0",background:"#fff",color:"#555",fontSize:13,cursor:"pointer" }} onClick={doReset}>続けて作成</button>
-              <button style={{ flex:1,padding:"11px",borderRadius:8,border:"none",background:"#1a6fd4",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer" }} onClick={()=>setScreen("ar")}>売掛管理を確認</button>
+        {!completed&&<div style={{ display:"flex", gap:8, alignItems:"center" }}>{[1,2,3].map(n=><div key={n} style={{ display:"flex",alignItems:"center",gap:4 }}><div style={{ width:24,height:24,borderRadius:12,background:step>=n?"#1a6fd4":"#e8ecf3",color:step>=n?"#fff":"#aaa",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>{n}</div><span style={{ fontSize:11,color:step===n?"#1a6fd4":"#bbb",fontWeight:step===n?700:400 }}>{["会社・基本情報","明細入力","プレビュー"][n-1]}</span>{n<3&&<span style={{ color:"#ddd",margin:"0 2px" }}>›</span>}</div>)}</div>}
+      </div>
+      {completed ? (
+        <div style={{ maxWidth:480,margin:"40px auto",textAlign:"center" }}>
+          <div style={{ width:72,height:72,borderRadius:36,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",fontSize:36 }}>✓</div>
+          <div style={{ fontSize:20,fontWeight:700,marginBottom:8 }}>請求書を発行しました</div>
+          <div style={{ fontSize:13,color:"#888",marginBottom:24,lineHeight:1.8 }}>{invNum}　{fmt(total)}<br/>{form.client} 宛</div>
+          <div style={{ background:"#f7f9fc",borderRadius:12,padding:"16px 20px",marginBottom:20,textAlign:"left" }}>
+            <div style={{ fontSize:11,color:"#aaa",marginBottom:10,fontWeight:600 }}>自動反映済み</div>
+            {[["✓","売上入力シートに追加"],["✓","売掛管理に追加（未入金）"],["✓","損益計算書に反映"]].map(([ic,t],i)=><div key={i} style={{ display:"flex",alignItems:"center",gap:10,marginBottom:8 }}><span style={{ color:"#3B6D11",fontWeight:700 }}>{ic}</span><span style={{ fontSize:13,color:"#555" }}>{t}</span></div>)}
+          </div>
+          <div style={{ display:"flex",gap:10 }}>
+            <button style={{ flex:1,padding:"11px",borderRadius:8,border:"1px solid #dce3f0",background:"#fff",color:"#555",fontSize:13,cursor:"pointer" }} onClick={doReset}>続けて作成</button>
+            <button style={{ flex:1,padding:"11px",borderRadius:8,border:"none",background:"#1a6fd4",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer" }} onClick={()=>setScreen("ar")}>売掛管理を確認</button>
+          </div>
+        </div>
+      ) : step===1 ? (
+        <div style={{ maxWidth:600,margin:"0 auto" }}>
+          <div style={s.formCard}>
+            <div style={s.formTitle}>請求元を選択</div>
+            {companies.map(co=><div key={co.id} style={{ padding:"12px 14px",borderRadius:10,border:"2px solid #1a6fd4",background:"#E6F1FB",marginBottom:16 }}><div style={{ display:"flex",alignItems:"center",gap:10 }}><div style={{ width:32,height:32,borderRadius:6,background:"#1a6fd4",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700 }}>{co.stamp}</div><div><div style={{ fontSize:13,fontWeight:600 }}>{co.name}</div><div style={{ fontSize:11,color:"#6a9fd4" }}>{co.addr}</div></div></div></div>)}
+            <div style={s.formTitle}>基本情報</div>
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
+              <FR label="請求先">
+                <select style={s.inp} value={form.client} onChange={e=>sf("client",e.target.value)}>
+                  <option value="">選択してください</option>
+                  {clientOptions.map(c=><option key={c}>{c}</option>)}
+                </select>
+              </FR>
+              <FR label="請求日"><input type="date" style={s.inp} value={form.issueDate} onChange={e=>sf("issueDate",e.target.value)} /></FR>
+              <FR label="支払期限"><input type="date" style={s.inp} value={form.dueDate} onChange={e=>sf("dueDate",e.target.value)} /></FR>
+              <FR label="件名"><input style={s.inp} value={form.subject} onChange={e=>sf("subject",e.target.value)} placeholder="Webサイト制作費" /></FR>
             </div>
           </div>
-        ) : step===1 ? (
-          <div style={{ maxWidth:600,margin:"0 auto" }}>
+          <div style={{ textAlign:"right" }}><button style={s.btnP} onClick={()=>setStep(2)} disabled={!form.client}>次へ：明細入力 ›</button></div>
+        </div>
+      ) : step===2 ? (
+        <div style={{ maxWidth:600,margin:"0 auto" }}>
+          <div style={s.formCard}>
+            <div style={s.formTitle}>明細</div>
+            {items.map((it,i)=>(
+              <div key={i} style={{ border:"1px solid #e8ecf3",borderRadius:8,padding:"12px 14px",marginBottom:10,background:"#fafbfd" }}>
+                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:8 }}><span style={{ fontSize:12,fontWeight:600,color:"#888" }}>明細 {i+1}</span><button style={{ background:"none",border:"none",color:"#ccc",cursor:"pointer" }} onClick={()=>removeItem(i)}>✕</button></div>
+                <div style={{ display:"grid",gridTemplateColumns:"2fr 1fr 1fr 2fr",gap:8 }}>
+                  <FR label="品名"><input style={s.inp} value={it.desc} onChange={e=>setItem(i,"desc",e.target.value)} placeholder="Webサイト制作" /></FR>
+                  <FR label="数量"><input type="number" style={s.inp} value={it.qty} onChange={e=>setItem(i,"qty",e.target.value)} /></FR>
+                  <FR label="単位"><select style={s.inp} value={it.unit} onChange={e=>setItem(i,"unit",e.target.value)}>{["式","個","時間","日","月","回","件"].map(u=><option key={u}>{u}</option>)}</select></FR>
+                  <FR label="単価"><input type="number" style={s.inp} value={it.price} onChange={e=>setItem(i,"price",e.target.value)} /></FR>
+                </div>
+                <div style={{ textAlign:"right",fontSize:12,color:"#888",marginTop:6 }}>小計：{fmt(Number(it.qty||0)*Number(it.price||0))}</div>
+              </div>
+            ))}
+            <button style={{ width:"100%",padding:"10px",borderRadius:8,border:"1px dashed #c5d8f5",background:"#f0f6ff",color:"#1a6fd4",fontSize:13,fontWeight:600,cursor:"pointer",marginBottom:16 }} onClick={addItem}>＋ 明細を追加</button>
+            <div style={{ background:"#f7f9fc",borderRadius:8,padding:"12px 14px" }}>
+              <div style={{ display:"flex",justifyContent:"space-between",fontSize:13,color:"#888",marginBottom:6 }}><span>小計</span><span>{fmt(subtotal)}</span></div>
+              <div style={{ display:"flex",justifyContent:"space-between",fontSize:13,color:"#888",marginBottom:8 }}>
+                <span>消費税</span>
+                <span style={{ display:"flex",alignItems:"center",gap:8 }}>
+                  <select style={{ ...s.inp,width:120,height:28,fontSize:12 }} value={taxRate2} onChange={e=>setTaxRate2(Number(e.target.value))}><option value={10}>10%</option><option value={8}>8%</option><option value={0}>0%</option></select>
+                  {fmt(tax2)}
+                </span>
+              </div>
+              <div style={{ display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:800,color:"#1a6fd4",borderTop:"1px solid #e8ecf3",paddingTop:8 }}><span>合計（税込）</span><span>{fmt(total)}</span></div>
+            </div>
+            <div style={{ marginTop:12 }}><FR label="備考"><input style={s.inp} value={memo} onChange={e=>setMemo(e.target.value)} placeholder="振込手数料はご負担ください" /></FR></div>
+          </div>
+          <div style={{ display:"flex",gap:10,justifyContent:"space-between" }}>
+            <button style={s.btnS} onClick={()=>setStep(1)}>‹ 戻る</button>
+            <button style={s.btnP} onClick={()=>setStep(3)}>プレビューを確認 ›</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ maxWidth:560,margin:"0 auto" }}>
+          <div style={{ background:"#fff",border:"1px solid #e8ecf3",borderRadius:12,overflow:"hidden",marginBottom:16 }}>
+            <div style={{ background:"#1a6fd4",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+              <div style={{ fontSize:16,fontWeight:700,color:"#fff",letterSpacing:4 }}>請　求　書</div>
+              <div style={{ fontSize:12,color:"#aad0f5" }}>{invNum}</div>
+            </div>
+            <div style={{ padding:"16px 18px" }}>
+              <div style={{ display:"flex",justifyContent:"space-between",marginBottom:16 }}>
+                <div><div style={{ fontSize:16,fontWeight:700 }}>{form.client} 御中</div><div style={{ fontSize:12,color:"#888",marginTop:4,lineHeight:1.8 }}>発行日：{form.issueDate}{form.dueDate&&<><br/>支払期限：{form.dueDate}</>}</div></div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ width:44,height:44,borderRadius:22,border:"2px solid #A32D2D",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#A32D2D",fontWeight:700,marginLeft:"auto",marginBottom:4 }}>角印</div>
+                  <div style={{ fontSize:11,color:"#666",lineHeight:1.7 }}>{selCo.name}<br/>{selCo.addr}</div>
+                </div>
+              </div>
+              {form.subject&&<div style={{ fontSize:13,fontWeight:600,marginBottom:12 }}>件名：{form.subject}</div>}
+              <table style={{ width:"100%",borderCollapse:"collapse",marginBottom:12,fontSize:12 }}>
+                <thead><tr style={{ background:"#f0f6ff" }}><th style={{ padding:"7px 8px",textAlign:"left",color:"#1a6fd4",fontWeight:600 }}>品名</th><th style={{ padding:"7px 8px",textAlign:"center",color:"#1a6fd4",fontWeight:600 }}>数量</th><th style={{ padding:"7px 8px",textAlign:"right",color:"#1a6fd4",fontWeight:600 }}>単価</th><th style={{ padding:"7px 8px",textAlign:"right",color:"#1a6fd4",fontWeight:600 }}>金額</th></tr></thead>
+                <tbody>{items.filter(it=>it.desc).map((it,i)=><tr key={i} style={{ borderBottom:"1px solid #f2f4f9" }}><td style={{ padding:"7px 8px" }}>{it.desc}</td><td style={{ padding:"7px 8px",textAlign:"center" }}>{it.qty}{it.unit}</td><td style={{ padding:"7px 8px",textAlign:"right" }}>{fmt(it.price)}</td><td style={{ padding:"7px 8px",textAlign:"right",fontWeight:600 }}>{fmt(Number(it.qty)*Number(it.price))}</td></tr>)}</tbody>
+              </table>
+              <div style={{ textAlign:"right",fontSize:12,color:"#888",marginBottom:4 }}>消費税（{taxRate2}%）　{fmt(tax2)}</div>
+              <div style={{ display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:800,color:"#1a6fd4",borderTop:"2px solid #1a6fd4",paddingTop:8,marginBottom:12 }}><span>合計（税込）</span><span>{fmt(total)}</span></div>
+              {selCo.bank&&<div style={{ background:"#f7f9fc",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#666",lineHeight:1.8,marginBottom:8 }}><div style={{ fontWeight:600,marginBottom:2 }}>お振込先</div><div>{selCo.bank}</div>{memo&&<><div style={{ fontWeight:600,marginTop:6,marginBottom:2 }}>備考</div><div>{memo}</div></>}</div>}
+            </div>
+          </div>
+          <div style={{ display:"flex",gap:10 }}>
+            <button style={s.btnS} onClick={()=>setStep(2)}>‹ 修正</button>
+            <button style={{ ...s.btnS,flex:1 }}>⬇ PDF保存</button>
+            <button style={{ ...s.btnP,flex:2 }} onClick={doComplete}>✦ 発行・送付する</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MASTER SCREEN ─────────────────────────────────────────────────────────────
+function MasterScreen({ master, setMaster, showToast }) {
+  const [tab, setTab] = useState("company");
+  const [co, setCo] = useState(master.company);
+  const [accounts, setAccounts] = useState(master.accounts);
+  const [clients, setClients] = useState(master.clients);
+  const [newClient, setNewClient] = useState({ name:"", addr:"", bankName:"", bankBranch:"", bankType:"普通", bankNo:"", bankHolder:"" });
+  const [newAccount, setNewAccount] = useState({ label:"", category:"sga", examples:"" });
+
+  const saveMaster = () => {
+    setMaster({ ...master, company:co, accounts, clients });
+    showToast("マスター情報を保存しました");
+  };
+
+  return (
+    <div style={s.screenWrap}>
+      <div style={s.pageHeader}>
+        <div style={s.pageTitle}>マスター設定</div>
+        <button style={s.btnP} onClick={saveMaster}>保存する</button>
+      </div>
+
+      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+        {[["company","会社情報"],["accounts","勘定科目"],["clients","取引先"]].map(([id,label]) => (
+          <button key={id} style={{ ...s.taxBtn, ...(tab===id?s.taxActive:{}), border:"1px solid", borderColor:tab===id?"#1a6fd4":"#dce3f0", borderRadius:8, padding:"8px 16px", fontSize:13 }} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === "company" && (
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+          <div style={s.formCard}>
+            <div style={s.formTitle}>基本情報</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <FR label="会社名・屋号"><input style={s.inp} value={co.name} onChange={e=>setCo({...co,name:e.target.value})} placeholder="株式会社〇〇" /></FR>
+              <FR label="法人 / 個人事業主"><select style={s.inp} value={co.type} onChange={e=>setCo({...co,type:e.target.value})}><option>法人</option><option>個人事業主</option></select></FR>
+              <FR label="設立年"><input style={s.inp} value={co.established} onChange={e=>setCo({...co,established:e.target.value})} placeholder="2020" /></FR>
+              <FR label="資本金"><input style={s.inp} value={co.capital} onChange={e=>setCo({...co,capital:e.target.value})} placeholder="1000000" /></FR>
+              <FR label="住所"><input style={s.inp} value={co.addr} onChange={e=>setCo({...co,addr:e.target.value})} placeholder="東京都〇〇区..." /></FR>
+              <FR label="電話番号"><input style={s.inp} value={co.tel} onChange={e=>setCo({...co,tel:e.target.value})} placeholder="03-0000-0000" /></FR>
+              <FR label="メール"><input style={s.inp} value={co.email} onChange={e=>setCo({...co,email:e.target.value})} placeholder="info@example.com" /></FR>
+            </div>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
             <div style={s.formCard}>
-              <div style={s.formTitle}>請求元を選択</div>
-              {companies.map(co=><div key={co.id} style={{ padding:"12px 14px",borderRadius:10,border:"2px solid #1a6fd4",background:"#E6F1FB",marginBottom:16 }}><div style={{ display:"flex",alignItems:"center",gap:10 }}><div style={{ width:32,height:32,borderRadius:6,background:"#1a6fd4",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700 }}>{co.stamp}</div><div><div style={{ fontSize:13,fontWeight:600 }}>{co.name}</div><div style={{ fontSize:11,color:"#6a9fd4" }}>{co.addr}</div></div></div></div>)}
-              <div style={s.formTitle}>基本情報</div>
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
-                <FR label="請求先">
-                  <select style={s.inp} value={form.client} onChange={e=>sf("client",e.target.value)}>
-                    <option value="">選択してください</option>
-                    {clientOptions.map(c=><option key={c}>{c}</option>)}
+              <div style={s.formTitle}>決算・税務設定</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                <FR label="決算月（開始月）" hint="例）3月決算なら「4月」が期首になります">
+                  <select style={s.inp} value={co.fiscalMonth} onChange={e=>setCo({...co,fiscalMonth:Number(e.target.value)})}>
+                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{m}月始まり（{m===1?12:m-1}月決算）</option>)}
                   </select>
                 </FR>
-                <FR label="請求日"><input type="date" style={s.inp} value={form.issueDate} onChange={e=>sf("issueDate",e.target.value)} /></FR>
-                <FR label="支払期限"><input type="date" style={s.inp} value={form.dueDate} onChange={e=>sf("dueDate",e.target.value)} /></FR>
-                <FR label="件名"><input style={s.inp} value={form.subject} onChange={e=>sf("subject",e.target.value)} placeholder="Webサイト制作費" /></FR>
+                <FR label="第何期目"><input type="number" style={s.inp} value={co.fiscalNum} onChange={e=>setCo({...co,fiscalNum:Number(e.target.value)})} placeholder="1" min="1" /></FR>
+                <FR label="予定税率（%）" hint="法人税・住民税・事業税の合計。中小企業は約25〜35%が目安です">
+                  <select style={s.inp} value={co.taxRate} onChange={e=>setCo({...co,taxRate:Number(e.target.value)})}>
+                    {[15,20,25,30,33,35,40].map(r=><option key={r} value={r}>{r}%</option>)}
+                  </select>
+                </FR>
               </div>
             </div>
-            <div style={{ textAlign:"right" }}><button style={s.btnP} onClick={()=>setStep(2)} disabled={!form.client}>次へ：明細入力 ›</button></div>
-          </div>
-        ) : step===2 ? (
-          <div style={{ maxWidth:600,margin:"0 auto" }}>
             <div style={s.formCard}>
-              <div style={s.formTitle}>明細</div>
-              {items.map((it,i)=>(
-                <div key={i} style={{ border:"1px solid #e8ecf3",borderRadius:8,padding:"12px 14px",marginBottom:10,background:"#fafbfd" }}>
-                  <div style={{ display:"flex",justifyContent:"space-between",marginBottom:8 }}><span style={{ fontSize:12,fontWeight:600,color:"#888" }}>明細 {i+1}</span><button style={{ background:"none",border:"none",color:"#ccc",cursor:"pointer" }} onClick={()=>removeItem(i)}>✕</button></div>
-                  <div style={{ display:"grid",gridTemplateColumns:"2fr 1fr 1fr 2fr",gap:8 }}>
-                    <FR label="品名"><input style={s.inp} value={it.desc} onChange={e=>setItem(i,"desc",e.target.value)} placeholder="Webサイト制作" /></FR>
-                    <FR label="数量"><input type="number" style={s.inp} value={it.qty} onChange={e=>setItem(i,"qty",e.target.value)} /></FR>
-                    <FR label="単位"><select style={s.inp} value={it.unit} onChange={e=>setItem(i,"unit",e.target.value)}>{["式","個","時間","日","月","回","件"].map(u=><option key={u}>{u}</option>)}</select></FR>
-                    <FR label="単価"><input type="number" style={s.inp} value={it.price} onChange={e=>setItem(i,"price",e.target.value)} /></FR>
-                  </div>
-                  <div style={{ textAlign:"right",fontSize:12,color:"#888",marginTop:6 }}>小計：{fmt(Number(it.qty||0)*Number(it.price||0))}</div>
-                </div>
-              ))}
-              <button style={{ width:"100%",padding:"10px",borderRadius:8,border:"1px dashed #c5d8f5",background:"#f0f6ff",color:"#1a6fd4",fontSize:13,fontWeight:600,cursor:"pointer",marginBottom:16 }} onClick={addItem}>＋ 明細を追加</button>
-              <div style={{ background:"#f7f9fc",borderRadius:8,padding:"12px 14px" }}>
-                <div style={{ display:"flex",justifyContent:"space-between",fontSize:13,color:"#888",marginBottom:6 }}><span>小計</span><span>{fmt(subtotal)}</span></div>
-                <div style={{ display:"flex",justifyContent:"space-between",fontSize:13,color:"#888",marginBottom:8 }}>
-                  <span>消費税</span>
-                  <span style={{ display:"flex",alignItems:"center",gap:8 }}>
-                    <select style={{ ...s.inp,width:120,height:28,fontSize:12 }} value={taxRate2} onChange={e=>setTaxRate2(Number(e.target.value))}><option value={10}>10%</option><option value={8}>8%</option><option value={0}>0%</option></select>
-                    {fmt(tax2)}
-                  </span>
-                </div>
-                <div style={{ display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:800,color:"#1a6fd4",borderTop:"1px solid #e8ecf3",paddingTop:8 }}><span>合計（税込）</span><span>{fmt(total)}</span></div>
+              <div style={s.formTitle}>振込先口座</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                <FR label="銀行名"><input style={s.inp} value={co.bankName} onChange={e=>setCo({...co,bankName:e.target.value})} placeholder="〇〇銀行" /></FR>
+                <FR label="支店名"><input style={s.inp} value={co.bankBranch} onChange={e=>setCo({...co,bankBranch:e.target.value})} placeholder="〇〇支店" /></FR>
+                <FR label="口座種別"><select style={s.inp} value={co.bankType} onChange={e=>setCo({...co,bankType:e.target.value})}><option>普通</option><option>当座</option></select></FR>
+                <FR label="口座番号"><input style={s.inp} value={co.bankNo} onChange={e=>setCo({...co,bankNo:e.target.value})} placeholder="1234567" /></FR>
+                <FR label="口座名義"><input style={s.inp} value={co.bankHolder} onChange={e=>setCo({...co,bankHolder:e.target.value})} placeholder="カ)マルマル" /></FR>
               </div>
-              <div style={{ marginTop:12 }}><FR label="備考"><input style={s.inp} value={memo} onChange={e=>setMemo(e.target.value)} placeholder="振込手数料はご負担ください" /></FR></div>
-            </div>
-            <div style={{ display:"flex",gap:10,justifyContent:"space-between" }}>
-              <button style={s.btnS} onClick={()=>setStep(1)}>‹ 戻る</button>
-              <button style={s.btnP} onClick={()=>setStep(3)}>プレビューを確認 ›</button>
             </div>
           </div>
-        ) : (
-          <div style={{ maxWidth:560,margin:"0 auto" }}>
-            <div style={{ background:"#fff",border:"1px solid #e8ecf3",borderRadius:12,overflow:"hidden",marginBottom:16 }}>
-              <div style={{ background:"#1a6fd4",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                <div style={{ fontSize:16,fontWeight:700,color:"#fff",letterSpacing:4 }}>請　求　書</div>
-                <div style={{ fontSize:12,color:"#aad0f5" }}>{invNum}</div>
-              </div>
-              <div style={{ padding:"16px 18px" }}>
-                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:16 }}>
-                  <div><div style={{ fontSize:16,fontWeight:700 }}>{form.client} 御中</div><div style={{ fontSize:12,color:"#888",marginTop:4,lineHeight:1.8 }}>発行日：{form.issueDate}{form.dueDate&&<><br/>支払期限：{form.dueDate}</>}</div></div>
-                  <div style={{ textAlign:"right" }}>
-                    <div style={{ width:44,height:44,borderRadius:22,border:"2px solid #A32D2D",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#A32D2D",fontWeight:700,marginLeft:"auto",marginBottom:4 }}>角印</div>
-                    <div style={{ fontSize:11,color:"#666",lineHeight:1.7 }}>{selCo.name}<br/>{selCo.addr}</div>
-                  </div>
-                </div>
-                {form.subject&&<div style={{ fontSize:13,fontWeight:600,marginBottom:12 }}>件名：{form.subject}</div>}
-                <table style={{ width:"100%",borderCollapse:"collapse",marginBottom:12,fontSize:12 }}>
-                  <thead><tr style={{ background:"#f0f6ff" }}><th style={{ padding:"7px 8px",textAlign:"left",color:"#1a6fd4",fontWeight:600 }}>品名</th><th style={{ padding:"7px 8px",textAlign:"center",color:"#1a6fd4",fontWeight:600 }}>数量</th><th style={{ padding:"7px 8px",textAlign:"right",color:"#1a6fd4",fontWeight:600 }}>単価</th><th style={{ padding:"7px 8px",textAlign:"right",color:"#1a6fd4",fontWeight:600 }}>金額</th></tr></thead>
-                  <tbody>{items.filter(it=>it.desc).map((it,i)=><tr key={i} style={{ borderBottom:"1px solid #f2f4f9" }}><td style={{ padding:"7px 8px" }}>{it.desc}</td><td style={{ padding:"7px 8px",textAlign:"center" }}>{it.qty}{it.unit}</td><td style={{ padding:"7px 8px",textAlign:"right" }}>{fmt(it.price)}</td><td style={{ padding:"7px 8px",textAlign:"right",fontWeight:600 }}>{fmt(Number(it.qty)*Number(it.price))}</td></tr>)}</tbody>
-                </table>
-                <div style={{ textAlign:"right",fontSize:12,color:"#888",marginBottom:4 }}>消費税（{taxRate2}%）　{fmt(tax2)}</div>
-                <div style={{ display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:800,color:"#1a6fd4",borderTop:"2px solid #1a6fd4",paddingTop:8,marginBottom:12 }}><span>合計（税込）</span><span>{fmt(total)}</span></div>
-                {selCo.bank&&<div style={{ background:"#f7f9fc",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#666",lineHeight:1.8,marginBottom:8 }}><div style={{ fontWeight:600,marginBottom:2 }}>お振込先</div><div>{selCo.bank}</div>{memo&&<><div style={{ fontWeight:600,marginTop:6,marginBottom:2 }}>備考</div><div>{memo}</div></>}</div>}
-              </div>
-            </div>
-            <div style={{ display:"flex",gap:10 }}>
-              <button style={s.btnS} onClick={()=>setStep(2)}>‹ 修正</button>
-              <button style={{ ...s.btnS,flex:1 }}>⬇ PDF保存</button>
-              <button style={{ ...s.btnP,flex:2 }} onClick={doComplete}>✦ 発行・送付する</button>
+        </div>
+      )}
+
+      {tab === "accounts" && (
+        <div>
+          <div style={s.tblWrap}>
+            <table style={s.tbl}>
+              <thead><tr>{["科目名","分類","使用例",""].map(h=><th key={h} style={{ ...s.th, textAlign:"left" }}>{h}</th>)}</tr></thead>
+              <tbody>
+                {accounts.map((a,i) => (
+                  <tr key={a.id} style={s.tr}>
+                    <td style={{ ...s.td, fontWeight:500 }}>{a.label}</td>
+                    <td style={s.td}><span style={{ ...s.badge, ...(a.category==="revenue"?s.bGreen:a.category==="cogs"?s.bAmber:s.bGreen) }}>{a.category==="revenue"?"売上":a.category==="cogs"?"原価":"販管費"}</span></td>
+                    <td style={{ ...s.td, color:"#888", fontSize:11 }}>{a.examples}</td>
+                    <td style={s.td}><input style={{ ...s.inp, width:200, fontSize:11 }} value={a.examples} onChange={e=>setAccounts(prev=>prev.map((ac,idx)=>idx===i?{...ac,examples:e.target.value}:ac))} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={s.formCard}>
+            <div style={s.formTitle}>勘定科目を追加</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 2fr auto", gap:10, alignItems:"end" }}>
+              <FR label="科目名"><input style={s.inp} value={newAccount.label} onChange={e=>setNewAccount({...newAccount,label:e.target.value})} placeholder="新しい科目名" /></FR>
+              <FR label="分類"><select style={s.inp} value={newAccount.category} onChange={e=>setNewAccount({...newAccount,category:e.target.value})}><option value="revenue">売上</option><option value="cogs">原価</option><option value="sga">販管費</option></select></FR>
+              <FR label="使用例"><input style={s.inp} value={newAccount.examples} onChange={e=>setNewAccount({...newAccount,examples:e.target.value})} placeholder="例：〇〇費、△△代など" /></FR>
+              <button style={{ ...s.btnP, height:36 }} onClick={() => { if (!newAccount.label) return; setAccounts(prev=>[...prev,{ ...newAccount, id:`custom_${Date.now()}` }]); setNewAccount({ label:"", category:"sga", examples:"" }); }}>追加</button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {tab === "clients" && (
+        <div>
+          <div style={s.tblWrap}>
+            <table style={s.tbl}>
+              <thead><tr>{["会社名","住所","銀行","口座番号","名義",""].map(h=><th key={h} style={{ ...s.th, textAlign:"left" }}>{h}</th>)}</tr></thead>
+              <tbody>
+                {clients.map((c,i) => (
+                  <tr key={c.id} style={s.tr}>
+                    <td style={{ ...s.td, fontWeight:500 }}>{c.name}</td>
+                    <td style={{ ...s.td, color:"#888", fontSize:11 }}>{c.addr}</td>
+                    <td style={{ ...s.td, fontSize:11 }}>{c.bankName} {c.bankBranch}</td>
+                    <td style={{ ...s.td, fontSize:11 }}>{c.bankType} {c.bankNo}</td>
+                    <td style={{ ...s.td, fontSize:11 }}>{c.bankHolder}</td>
+                    <td style={s.td}><button style={{ ...s.btnS, fontSize:11, padding:"3px 10px", color:"#A32D2D", borderColor:"#f09595" }} onClick={() => setClients(prev=>prev.filter((_,idx)=>idx!==i))}>削除</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={s.formCard}>
+            <div style={s.formTitle}>取引先を追加</div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
+              <FR label="会社名"><input style={s.inp} value={newClient.name} onChange={e=>setNewClient({...newClient,name:e.target.value})} placeholder="㈱〇〇商事" /></FR>
+              <FR label="住所"><input style={s.inp} value={newClient.addr} onChange={e=>setNewClient({...newClient,addr:e.target.value})} placeholder="東京都..." /></FR>
+              <FR label="銀行名"><input style={s.inp} value={newClient.bankName} onChange={e=>setNewClient({...newClient,bankName:e.target.value})} placeholder="〇〇銀行" /></FR>
+              <FR label="支店名"><input style={s.inp} value={newClient.bankBranch} onChange={e=>setNewClient({...newClient,bankBranch:e.target.value})} placeholder="〇〇支店" /></FR>
+              <FR label="口座種別"><select style={s.inp} value={newClient.bankType} onChange={e=>setNewClient({...newClient,bankType:e.target.value})}><option>普通</option><option>当座</option></select></FR>
+              <FR label="口座番号"><input style={s.inp} value={newClient.bankNo} onChange={e=>setNewClient({...newClient,bankNo:e.target.value})} placeholder="1234567" /></FR>
+              <FR label="口座名義"><input style={s.inp} value={newClient.bankHolder} onChange={e=>setNewClient({...newClient,bankHolder:e.target.value})} placeholder="カ)マルマル" /></FR>
+            </div>
+            <div style={{ textAlign:"right", marginTop:10 }}>
+              <button style={s.btnP} onClick={() => { if (!newClient.name) return; setClients(prev=>[...prev,{ ...newClient, id:Date.now() }]); setNewClient({ name:"", addr:"", bankName:"", bankBranch:"", bankType:"普通", bankNo:"", bankHolder:"" }); }}>追加する</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -971,29 +1061,14 @@ function FR({ label, hint, children }) {
 
 // ── STYLES ────────────────────────────────────────────────────────────────────
 const s = {
-  root:         { fontFamily:"'Hiragino Sans','Noto Sans JP',sans-serif", background:"#f4f6fb", minHeight:"100vh", fontSize:13 },
-  toast:        { position:"fixed", top:16, right:16, zIndex:300, padding:"10px 16px", borderRadius:8, border:"1px solid", fontSize:13, fontWeight:500 },
-  page:         { display:"flex", flexDirection:"column", minHeight:"100vh" },
-  topbar:       { display:"flex", alignItems:"center", justifyContent:"space-between", background:"#fff", borderBottom:"1px solid #e5e9f0", padding:"0 20px", height:48, position:"sticky", top:0, zIndex:50 },
-  logo:         { fontSize:17, fontWeight:700, letterSpacing:-0.5, color:"#111" },
-  navTab:       { padding:"6px 12px", borderRadius:6, fontSize:12, border:"none", background:"transparent", color:"#777", cursor:"pointer", whiteSpace:"nowrap" },
-  navTabActive: { background:"#e8f0fb", color:"#1a6fd4", fontWeight:600 },
-  navTabOP:     { background:"#E6F1FB", color:"#1a6fd4", fontWeight:700, border:"1px solid #c5d8f5" },
-  navTabOPActive:{ background:"#1a6fd4", color:"#fff", fontWeight:700 },
-  navTabLocked: { color:"#bbb", background:"transparent", cursor:"pointer", opacity:0.7 },
+  screenWrap:   { padding:"28px 28px 60px" },
+  pageHeader:   { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 },
+  pageTitle:    { fontSize:22, fontWeight:800, color:"#111", letterSpacing:-0.5 },
+  statCard:     { background:"#fff", border:"1px solid #e8ecf3", borderRadius:12, padding:"16px 18px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" },
+  statLabel:    { fontSize:11, color:"#999", marginBottom:6, fontWeight:600 },
   taxSwitch:    { display:"flex", background:"#f0f0f0", borderRadius:6, padding:2, gap:2 },
-  taxBtn:       { padding:"4px 12px", borderRadius:4, fontSize:12, border:"none", background:"transparent", color:"#888", cursor:"pointer" },
-  taxActive:    { background:"#fff", color:"#1a6fd4", fontWeight:600 },
-  content:      { padding:"20px 24px", flex:1 },
-  pageHeader:   { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 },
-  pageTitle:    { fontSize:18, fontWeight:700, color:"#111" },
-  statCard:     { background:"#fff", border:"1px solid #e8ecf3", borderRadius:10, padding:"12px 14px" },
-  statLabel:    { fontSize:11, color:"#999", marginBottom:4 },
-  statSub:      { fontSize:10, color:"#bbb", marginTop:3 },
-  monthBar:     { display:"flex", gap:4, marginBottom:14, flexWrap:"wrap" },
-  monthBtn:     { padding:"4px 10px", borderRadius:20, border:"1px solid #e0e0e0", background:"#fff", fontSize:11, color:"#777", cursor:"pointer" },
-  monthActive:  { background:"#1a6fd4", color:"#fff", borderColor:"#1a6fd4", fontWeight:600 },
-  menuCard:     { background:"#fff", border:"1px solid #e8ecf3", borderRadius:12, padding:"18px 14px", textAlign:"center", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:8 },
+  taxBtn:       { padding:"5px 14px", borderRadius:4, fontSize:12, border:"none", background:"transparent", color:"#888", cursor:"pointer" },
+  taxActive:    { background:"#fff", color:"#1a6fd4", fontWeight:700 },
   formCard:     { background:"#fff", border:"1px solid #dce3f0", borderRadius:12, padding:20, marginBottom:16 },
   formTitle:    { fontSize:14, fontWeight:700, color:"#111", marginBottom:14 },
   formGrid:     { display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 },
@@ -1002,23 +1077,23 @@ const s = {
   alertBox:     { marginTop:10, background:"#FAEEDA", border:"1px solid #EF9F27", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#633806", display:"flex", alignItems:"center", justifyContent:"space-between" },
   alertDis:     { fontSize:11, color:"#854F0B", background:"#fff", border:"1px solid #EF9F27", borderRadius:5, padding:"3px 10px", cursor:"pointer" },
   formBtns:     { display:"flex", gap:10, marginTop:14, justifyContent:"flex-end" },
-  btnP:         { padding:"8px 20px", borderRadius:8, border:"none", background:"#1a6fd4", color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer" },
-  btnS:         { padding:"8px 16px", borderRadius:8, border:"1px solid #dce3f0", background:"#fff", color:"#555", fontSize:13, cursor:"pointer" },
-  tblWrap:      { background:"#fff", border:"1px solid #e8ecf3", borderRadius:10, overflow:"hidden", marginBottom:12 },
+  btnP:         { padding:"9px 22px", borderRadius:8, border:"none", background:"#1a6fd4", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" },
+  btnS:         { padding:"9px 16px", borderRadius:8, border:"1px solid #dce3f0", background:"#fff", color:"#555", fontSize:13, cursor:"pointer" },
+  tblWrap:      { background:"#fff", border:"1px solid #e8ecf3", borderRadius:12, overflow:"hidden", marginBottom:14 },
   tbl:          { width:"100%", borderCollapse:"collapse" },
-  th:           { background:"#f7f9fc", fontSize:11, fontWeight:600, color:"#aaa", padding:"8px 12px", borderBottom:"1px solid #edf0f7", textAlign:"right", whiteSpace:"nowrap" },
-  td:           { fontSize:12, color:"#333", padding:"9px 12px", borderBottom:"1px solid #f2f4f9", whiteSpace:"nowrap" },
+  th:           { background:"#f7f9fc", fontSize:11, fontWeight:600, color:"#aaa", padding:"9px 12px", borderBottom:"1px solid #edf0f7", textAlign:"right", whiteSpace:"nowrap" },
+  td:           { fontSize:12, color:"#333", padding:"10px 12px", borderBottom:"1px solid #f2f4f9", whiteSpace:"nowrap" },
   tr:           { transition:"background 0.1s" },
   badge:        { display:"inline-block", fontSize:10, padding:"2px 8px", borderRadius:10, fontWeight:600 },
   bGreen:       { background:"#EAF3DE", color:"#3B6D11" },
   bAmber:       { background:"#FAEEDA", color:"#854F0B" },
   bRed:         { background:"#FCEBEB", color:"#A32D2D" },
-  paidBtn:      { fontSize:11, padding:"3px 10px", borderRadius:5, border:"1px solid #9FE1CB", background:"#E1F5EE", color:"#0F6E56", cursor:"pointer", fontWeight:600, whiteSpace:"nowrap" },
+  paidBtn:      { fontSize:11, padding:"4px 12px", borderRadius:5, border:"1px solid #9FE1CB", background:"#E1F5EE", color:"#0F6E56", cursor:"pointer", fontWeight:600, whiteSpace:"nowrap" },
   plWrap:       { background:"#fff", border:"1px solid #e8ecf3", borderRadius:12, overflow:"hidden", marginBottom:16 },
-  plHdr:        { background:"#f7f9fc", padding:"10px 16px", borderBottom:"1px solid #edf0f7", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:13, fontWeight:600, color:"#333" },
-  plRow:        { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"9px 16px", borderBottom:"1px solid #f2f4f9" },
-  secTitle:     { fontSize:13, fontWeight:700, color:"#333", marginBottom:8 },
-  secTitleSub:  { fontSize:12, fontWeight:600, color:"#aaa", marginBottom:8, marginTop:12 },
+  plHdr:        { background:"#f7f9fc", padding:"12px 16px", borderBottom:"1px solid #edf0f7", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:13, fontWeight:600, color:"#333" },
+  plRow:        { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 16px", borderBottom:"1px solid #f2f4f9" },
+  secTitle:     { fontSize:14, fontWeight:700, color:"#333", marginBottom:8 },
+  secTitleSub:  { fontSize:12, fontWeight:600, color:"#aaa", marginBottom:8, marginTop:14 },
 };
 
 const css = `
@@ -1028,4 +1103,10 @@ const css = `
   input:focus,select:focus{border-color:#1a6fd4!important;outline:none;}
   ::-webkit-scrollbar{width:5px;height:5px;}
   ::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px;}
+
+  @media(max-width:768px){
+    .sidebar{ display:none !important; }
+    .bottom-nav{ display:flex !important; }
+    .main-area{ margin-left:0 !important; padding-bottom:58px; }
+  }
 `;
