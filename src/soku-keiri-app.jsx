@@ -454,10 +454,10 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
 
   // 4 gradient cards + 2 plain cards
   const gradKpis = [
-    { label:"今月売上",   v:val(totalSales), sub:`${curSales.length}件`,            grad:"linear-gradient(135deg,#1a6fd4,#4a9fe4)", modal:{ title:`${selMonth}　売上合計`,   amount:val(totalSales), color:"#1a6fd4", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
-    { label:"今月経費",   v:val(totalExp),   sub:`${curExp.length}件`,              grad:"linear-gradient(135deg,#EF9F27,#f4c05a)", modal:{ title:`${selMonth}　経費合計`,   amount:val(totalExp),   color:"#EF9F27", formula:`売上原価 ${val(genka)}\n＋ 販管費 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
-    { label:"営業利益",   v:val(opProfit),   sub:`利益率 ${totalSales?Math.round(opProfit/totalSales*100):0}%`, grad:"linear-gradient(135deg,#0F6E56,#2ecc8f)", modal:{ title:"営業利益", amount:val(opProfit), color:"#0F6E56", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。" }},
-    { label:"売掛残高",   v:val(ar),         sub:`${arCount}件 未入金`,             grad:"linear-gradient(135deg,#854F0B,#c47a2e)", modal:{ title:"売掛残高",               amount:val(ar),         color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }},
+    { label:"今月売上",   v:val(totalSales), sub:`今月の売上件数：${curSales.length}件`,                              grad:"linear-gradient(135deg,#1a6fd4,#4a9fe4)", modal:{ title:`${selMonth}　売上合計`,   amount:val(totalSales), color:"#1a6fd4", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
+    { label:"今月経費",   v:val(totalExp),   sub:`今月の経費件数：${curExp.length}件`,                               grad:"linear-gradient(135deg,#EF9F27,#f4c05a)", modal:{ title:`${selMonth}　経費合計`,   amount:val(totalExp),   color:"#EF9F27", formula:`売上原価 ${val(genka)}\n＋ 販管費 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
+    { label:"営業利益",   v:val(opProfit),   sub:`売上利益率：${totalSales?Math.round(opProfit/totalSales*100):0}%`, grad:"linear-gradient(135deg,#0F6E56,#2ecc8f)", modal:{ title:"営業利益", amount:val(opProfit), color:"#0F6E56", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。" }},
+    { label:"売掛残高",   v:val(ar),         sub:`未入金：${arCount}件`,                                             grad:"linear-gradient(135deg,#854F0B,#c47a2e)", modal:{ title:"売掛残高",               amount:val(ar),         color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }},
   ];
   const plainKpis = [
     { label:"予定経常利益", v:val(netProfit), color:netProfit>=0?"#0F6E56":"#A32D2D", sub:`納税${taxRate}%控除後`, modal:{ title:"予定経常利益", amount:val(netProfit), color:"#0F6E56", formula:`営業利益 ${val(opProfit)}\nー 予定納税（${taxRate}%） ${val(taxAmt)}\n＝ 予定経常利益 ${val(netProfit)}` }},
@@ -481,15 +481,21 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
           <div key={i} style={{ background:c.grad, borderRadius:16, padding:"18px 16px", boxShadow:"0 4px 16px rgba(0,0,0,0.12)", position:"relative", overflow:"hidden" }}>
             <div style={{ position:"absolute", right:-14, top:-14, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.08)" }}/>
             <div style={{ fontSize:10, color:"rgba(255,255,255,0.75)", fontWeight:700, marginBottom:10, letterSpacing:0.3 }}>{c.label}</div>
-            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:18, fontWeight:900, color:"#fff", display:"block", marginBottom:6, letterSpacing:-0.5, whiteSpace:"nowrap" }} />
-            <div style={{ fontSize:10, color:"rgba(255,255,255,0.6)" }}>{c.sub}</div>
+            <div style={{ display:"flex", alignItems:"baseline", gap:2, marginBottom:6 }}>
+              <N v={c.v.replace("円","")} modal={c.modal} setModal={setModal} style={{ fontSize:18, fontWeight:900, color:"#fff", letterSpacing:-0.5, whiteSpace:"nowrap" }} />
+              <span style={{ fontSize:14, fontWeight:700, color:"rgba(255,255,255,0.9)" }}>円</span>
+            </div>
+            <div style={{ fontSize:13, color:"rgba(255,255,255,0.85)" }}>{c.sub}</div>
           </div>
         ))}
         {plainKpis.map((c,i) => (
           <div key={i} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:16, padding:"18px 16px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
             <div style={{ fontSize:10, color:"#999", fontWeight:700, marginBottom:10 }}>{c.label}</div>
-            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:18, fontWeight:900, color:c.color, display:"block", marginBottom:6, letterSpacing:-0.5, whiteSpace:"nowrap" }} />
-            <div style={{ fontSize:10, color:"#bbb" }}>{c.sub}</div>
+            <div style={{ display:"flex", alignItems:"baseline", gap:2, marginBottom:6 }}>
+              <N v={c.v.replace("円","")} modal={c.modal} setModal={setModal} style={{ fontSize:18, fontWeight:900, color:c.color, letterSpacing:-0.5, whiteSpace:"nowrap" }} />
+              <span style={{ fontSize:14, fontWeight:700, color:c.color }}>円</span>
+            </div>
+            <div style={{ fontSize:13, color:"#888" }}>{c.sub}</div>
           </div>
         ))}
       </div>
