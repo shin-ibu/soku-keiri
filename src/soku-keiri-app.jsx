@@ -162,7 +162,7 @@ function N({ v, modal, setModal, style }) {
 }
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
-function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master }) {
+function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master, selMonth, setSelMonth, fiscalMonths }) {
   const coName = master?.company?.name || "Soku経理";
   const navItems = [
     { id:"home",     icon:"◈", label:"ダッシュボード" },
@@ -208,13 +208,21 @@ function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModa
             </button>
         }
       </nav>
-      <div style={{ padding:"16px 20px 24px", borderTop:"1px solid rgba(255,255,255,0.07)" }}>
-        <div style={{ fontSize:10, color:"#4d6a99", fontWeight:600, marginBottom:8, letterSpacing:0.5 }}>表示モード</div>
+      {fiscalMonths && setSelMonth && (
+        <div style={{ padding:"12px 20px 0", borderTop:"1px solid rgba(255,255,255,0.07)" }}>
+          <div style={{ fontSize:10, color:"#4d6a99", fontWeight:600, marginBottom:6, letterSpacing:0.5 }}>対象月</div>
+          <select value={selMonth} onChange={e=>setSelMonth(e.target.value)} style={{ width:"100%", background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.14)", color:"#fff", borderRadius:7, padding:"7px 10px", fontSize:12, cursor:"pointer", outline:"none" }}>
+            {fiscalMonths.map(m=><option key={m} value={m} style={{ background:"#1a2340", color:"#fff" }}>{m}</option>)}
+          </select>
+        </div>
+      )}
+      <div style={{ padding:"14px 20px 24px", borderTop:"none" }}>
+        <div style={{ fontSize:10, color:"#4d6a99", fontWeight:600, marginBottom:8, letterSpacing:0.5, marginTop:14 }}>表示モード</div>
         <div style={{ display:"flex", background:"rgba(0,0,0,0.25)", borderRadius:6, padding:3, gap:2 }}>
           <button onClick={() => setTaxMode("inc")} style={{ flex:1, padding:"5px 0", borderRadius:4, border:"none", background:taxMode==="inc"?"rgba(255,255,255,0.18)":"transparent", color:taxMode==="inc"?"#fff":"#4d6a99", fontSize:12, cursor:"pointer", fontWeight:taxMode==="inc"?700:400 }}>税込</button>
           <button onClick={() => setTaxMode("exc")} style={{ flex:1, padding:"5px 0", borderRadius:4, border:"none", background:taxMode==="exc"?"rgba(255,255,255,0.18)":"transparent", color:taxMode==="exc"?"#fff":"#4d6a99", fontSize:12, cursor:"pointer", fontWeight:taxMode==="exc"?700:400 }}>税抜</button>
         </div>
-        <div style={{ fontSize:10, color:"#2d3d56", marginTop:12 }}>数字をクリックで根拠表示</div>
+        <div style={{ fontSize:10, color:"#2d3d56", marginTop:10 }}>数字をクリックで根拠表示</div>
       </div>
     </div>
   );
@@ -332,13 +340,13 @@ export default function App() {
   const Screen = Screens[screen] || HomeScreen;
 
   return (
-    <div style={{ fontFamily:"'Hiragino Sans','Noto Sans JP',sans-serif", fontSize:13, minHeight:"100vh" }}>
+    <div style={{ fontFamily:"'Hiragino Sans','Noto Sans JP',sans-serif", fontSize:13, display:"flex", minHeight:"100vh" }}>
       <style>{css}</style>
       {toast && <div style={{ position:"fixed", top:16, right:16, zIndex:300, padding:"10px 16px", borderRadius:8, border:"1px solid", fontSize:13, fontWeight:500, background:toast.type==="error"?"#FCEBEB":"#EAF3DE", color:toast.type==="error"?"#A32D2D":"#27500A", borderColor:toast.type==="error"?"#F09595":"#97C459" }}>{toast.type==="error"?"⚠ ":"✓ "}{toast.msg}</div>}
       <DrillModal modal={modal} onClose={() => setModal(null)} />
       {showOPModal && <OPModal onClose={() => setShowOPModal(false)} onContract={() => { setOpInvoice(true); setShowOPModal(false); setScreen("invoice"); showToast("請求書オプションを契約しました！"); }} />}
-      <Sidebar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={() => setShowOPModal(true)} master={master} />
-      <div className="main-area" style={{ marginLeft:240, background:"#f4f6fb", minHeight:"100vh" }}>
+      <Sidebar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={() => setShowOPModal(true)} master={master} selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
+      <div className="main-area" style={{ marginLeft:240, flex:1, background:"#f4f6fb", minHeight:"100vh", overflowX:"hidden" }}>
         <Screen {...shared} />
       </div>
       <BottomNav screen={screen} setScreen={setScreen} opInvoice={opInvoice} showOPModal={() => setShowOPModal(true)} />
@@ -354,15 +362,17 @@ function HomeScreen({ setScreen, taxMode, totalSales, totalExp, opProfit, netPro
   const fiscalLabel = fiscalIdx >= 0 ? `第${master.company.fiscalNum || 1}期 ${fiscalIdx+1}ヶ月目` : "";
 
   const kpis = [
-    { label:"今月売上", v:val(totalSales), raw:totalSales, color:"#0F6E56", sub:"売上合計", modal:{ title:`${selMonth}　売上合計`, amount:val(totalSales), color:"#0F6E56", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"区分":r.type,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
-    { label:"今月経費", v:val(totalExp),   raw:totalExp,   color:"#444",    sub:"経費合計", modal:{ title:`${selMonth}　経費合計`, amount:val(totalExp), formula:`売上原価 ${val(genka)}\n＋ 販管費合計 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
-    { label:"営業利益", v:val(opProfit),   raw:opProfit,   color:"#185FA5", sub:`利益率 ${totalSales?Math.round(opProfit/totalSales*100):0}%`, modal:{ title:"営業利益", amount:val(opProfit), color:"#185FA5", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。" }},
-    { label:"予定経常利益", v:val(netProfit), raw:netProfit, color:netProfit>=0?"#0F6E56":"#A32D2D", sub:`納税${taxRate}%控除後`, modal:{ title:"予定経常利益", amount:val(netProfit), color:"#0F6E56", formula:`営業利益 ${val(opProfit)}\nー 予定納税（${taxRate}%） ${val(taxAmt)}\n＝ 予定経常利益 ${val(netProfit)}` }},
+    { label:"今月売上",     v:val(totalSales), color:"#0F6E56", sub:"売上合計",                   modal:{ title:`${selMonth}　売上合計`,    amount:val(totalSales), color:"#0F6E56", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"区分":r.type,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
+    { label:"今月経費",     v:val(totalExp),   color:"#444",    sub:"経費合計",                   modal:{ title:`${selMonth}　経費合計`,    amount:val(totalExp),   formula:`売上原価 ${val(genka)}\n＋ 販管費合計 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
+    { label:"営業利益",     v:val(opProfit),   color:"#185FA5", sub:`利益率 ${totalSales?Math.round(opProfit/totalSales*100):0}%`, modal:{ title:"営業利益", amount:val(opProfit), color:"#185FA5", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。" }},
+    { label:"予定経常利益", v:val(netProfit),  color:netProfit>=0?"#0F6E56":"#A32D2D", sub:`納税${taxRate}%控除後`, modal:{ title:"予定経常利益", amount:val(netProfit), color:"#0F6E56", formula:`営業利益 ${val(opProfit)}\nー 予定納税（${taxRate}%） ${val(taxAmt)}\n＝ 予定経常利益 ${val(netProfit)}` }},
+    { label:"売掛残高",     v:val(ar),         color:"#854F0B", sub:`${arCount}件 未入金`,         modal:{ title:"売掛残高（未入金合計）",  amount:val(ar),         color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }},
+    { label:"買掛残高",     v:val(ap),         color:"#A32D2D", sub:`${apCount}件 未払い`,         modal:{ title:"買掛残高（未払い合計）",  amount:val(ap),         color:"#A32D2D", rows:expenses.filter(e=>e.status==="未払い").map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })), note:`${apCount}件が未払いです。` }},
   ];
 
   return (
     <div style={{ padding:"28px 28px 40px" }}>
-      <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:24 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:22 }}>
         <div>
           <div style={{ fontSize:22, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>ダッシュボード</div>
           {fiscalLabel && <div style={{ fontSize:12, color:"#aaa", marginTop:3 }}>{selMonth}　{fiscalLabel}</div>}
@@ -370,55 +380,31 @@ function HomeScreen({ setScreen, taxMode, totalSales, totalExp, opProfit, netPro
         <div style={{ fontSize:12, color:"#bbb" }}>{master.company.name || "会社名未設定"}</div>
       </div>
 
-      {/* Month bar */}
-      <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
-
-      {/* KPI cards */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
+      {/* 6 KPI cards */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:12, marginBottom:20 }}>
         {kpis.map((c,i) => (
-          <div key={i} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"18px 20px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
-            <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:10 }}>{c.label}</div>
-            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:26, fontWeight:900, color:c.color, display:"block", marginBottom:6, letterSpacing:-1 }} />
-            <div style={{ fontSize:11, color:"#bbb" }}>{c.sub}</div>
+          <div key={i} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"16px 14px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+            <div style={{ fontSize:10, color:"#999", fontWeight:600, marginBottom:8 }}>{c.label}</div>
+            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:17, fontWeight:900, color:c.color, display:"block", marginBottom:5, letterSpacing:-0.5, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} />
+            <div style={{ fontSize:10, color:"#bbb" }}>{c.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Chart + AR/AP + Menu */}
-      <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:20 }}>
-        {/* Left: donut + AR/AP */}
-        <div style={{ display:"flex", flexDirection:"column", gap:14, minWidth:260 }}>
-          <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"20px", display:"flex", flexDirection:"column", alignItems:"center", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
-            <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:14, alignSelf:"flex-start" }}>売上 vs 経費</div>
-            <DonutChart sales={totalSales} expenses={totalExp} size={200} setModal={setModal} val={val} />
-            <div style={{ display:"flex", gap:20, marginTop:16 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <div style={{ width:10, height:10, borderRadius:2, background:"#1a6fd4" }} />
-                <span style={{ fontSize:11, color:"#999" }}>売上</span>
-              </div>
-              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <div style={{ width:10, height:10, borderRadius:2, background:"#FCEBEB" }} />
-                <span style={{ fontSize:11, color:"#999" }}>経費</span>
-              </div>
+      {/* Chart + Menu */}
+      <div style={{ display:"grid", gridTemplateColumns:"240px 1fr", gap:20 }}>
+        {/* Left: donut chart */}
+        <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"20px", display:"flex", flexDirection:"column", alignItems:"center", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+          <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:14, alignSelf:"flex-start" }}>売上 vs 経費</div>
+          <DonutChart sales={totalSales} expenses={totalExp} size={160} setModal={setModal} val={val} />
+          <div style={{ display:"flex", gap:16, marginTop:14 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+              <div style={{ width:9, height:9, borderRadius:2, background:"#1a6fd4" }} />
+              <span style={{ fontSize:11, color:"#999" }}>売上</span>
             </div>
-          </div>
-
-          {/* AR/AP summary */}
-          <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"18px 20px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
-            <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:6 }}>売掛残高</div>
-              <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between" }}>
-                <N v={val(ar)} modal={{ title:"売掛残高（未入金合計）", amount:val(ar), color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }} setModal={setModal} style={{ fontSize:20, fontWeight:800, color:"#854F0B" }} />
-                <span style={{ fontSize:11, color:"#bbb" }}>{arCount}件未入金</span>
-              </div>
-            </div>
-            <div style={{ height:1, background:"#f2f4f9", margin:"10px 0" }} />
-            <div>
-              <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:6 }}>買掛残高</div>
-              <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between" }}>
-                <N v={val(ap)} modal={{ title:"買掛残高（未払い合計）", amount:val(ap), color:"#A32D2D", rows:expenses.filter(e=>e.status==="未払い").map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })), note:`${apCount}件が未払いです。` }} setModal={setModal} style={{ fontSize:20, fontWeight:800, color:"#A32D2D" }} />
-                <span style={{ fontSize:11, color:"#bbb" }}>{apCount}件未払い</span>
-              </div>
+            <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+              <div style={{ width:9, height:9, borderRadius:2, background:"#f09595" }} />
+              <span style={{ fontSize:11, color:"#999" }}>経費</span>
             </div>
           </div>
         </div>
@@ -426,17 +412,17 @@ function HomeScreen({ setScreen, taxMode, totalSales, totalExp, opProfit, netPro
         {/* Right: quick actions */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, alignContent:"start" }}>
           {[
-            { id:"sales",    icon:"↑", label:"売上入力",   sub:"日次の売上を記録",    bg:"#E1F5EE", ic:"#0F6E56" },
-            { id:"expenses", icon:"↓", label:"経費入力",   sub:"経費・支払いを記録",  bg:"#FAECE7", ic:"#993C1D" },
-            { id:"pl",       icon:"≡", label:"損益計算書", sub:"12ヶ月の損益を確認",  bg:"#E6F1FB", ic:"#185FA5" },
-            { id:"ar",       icon:"◎", label:"売掛・買掛", sub:"入金・支払いの消込",  bg:"#FAEEDA", ic:"#854F0B" },
+            { id:"sales",    icon:"↑", label:"売上入力",   sub:"日次の売上を記録",     bg:"#E1F5EE", ic:"#0F6E56" },
+            { id:"expenses", icon:"↓", label:"経費入力",   sub:"経費・支払いを記録",   bg:"#FAECE7", ic:"#993C1D" },
+            { id:"pl",       icon:"≡", label:"損益計算書", sub:"12ヶ月の損益を確認",   bg:"#E6F1FB", ic:"#185FA5" },
+            { id:"ar",       icon:"◎", label:"売掛・買掛", sub:"入金・支払いの消込",   bg:"#FAEEDA", ic:"#854F0B" },
             { id:"cashflow", icon:"⇄", label:"資金繰り",   sub:"キャッシュフロー確認", bg:"#EEEDFE", ic:"#534AB7" },
-            { id:"master",   icon:"⚙", label:"マスター",   sub:"会社情報・科目設定",  bg:"#f0f0f0", ic:"#555" },
+            { id:"master",   icon:"⚙", label:"マスター",   sub:"会社情報・科目設定",   bg:"#f0f0f0", ic:"#555" },
           ].map(m => (
-            <button key={m.id} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"20px 16px", textAlign:"center", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:10, boxShadow:"0 1px 4px rgba(0,0,0,0.04)", transition:"box-shadow 0.15s" }} onClick={() => setScreen(m.id)}>
-              <div style={{ width:48, height:48, borderRadius:12, background:m.bg, color:m.ic, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:700 }}>{m.icon}</div>
-              <div style={{ fontSize:13, fontWeight:700, color:"#222" }}>{m.label}</div>
-              <div style={{ fontSize:11, color:"#aaa" }}>{m.sub}</div>
+            <button key={m.id} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"18px 14px", textAlign:"center", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:8, boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }} onClick={() => setScreen(m.id)}>
+              <div style={{ width:44, height:44, borderRadius:11, background:m.bg, color:m.ic, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:700 }}>{m.icon}</div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#222" }}>{m.label}</div>
+              <div style={{ fontSize:10, color:"#aaa" }}>{m.sub}</div>
             </button>
           ))}
         </div>
@@ -1101,8 +1087,10 @@ const css = `
   button:hover{opacity:0.82;}
   tr:hover td{background:#f8faff!important;}
   input:focus,select:focus{border-color:#1a6fd4!important;outline:none;}
+  .sidebar select:focus{border-color:rgba(255,255,255,0.4)!important;}
   ::-webkit-scrollbar{width:5px;height:5px;}
   ::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px;}
+  .sidebar{flex-shrink:0;}
 
   @media(max-width:768px){
     .sidebar{ display:none !important; }
