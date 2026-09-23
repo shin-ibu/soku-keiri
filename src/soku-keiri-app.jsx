@@ -475,30 +475,34 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
         <div style={{ fontSize:12, color:"#bbb" }}>{master.company.name || "会社名未設定"}</div>
       </div>
 
-      {/* KPI row: 4 gradient + 2 plain */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr) repeat(2,1fr)", gap:12, marginBottom:20 }}>
-        {gradKpis.map((c,i) => (
-          <div key={i} style={{ background:c.grad, borderRadius:16, padding:"18px 16px", boxShadow:"0 4px 16px rgba(0,0,0,0.12)", position:"relative", overflow:"hidden" }}>
-            <div style={{ position:"absolute", right:-14, top:-14, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.08)" }}/>
-            <div style={{ fontSize:10, color:"rgba(255,255,255,0.75)", fontWeight:700, marginBottom:10, letterSpacing:0.3 }}>{c.label}</div>
-            <div style={{ display:"flex", alignItems:"baseline", gap:2, marginBottom:6 }}>
-              <N v={c.v.replace("円","")} modal={c.modal} setModal={setModal} style={{ fontSize:18, fontWeight:900, color:"#fff", letterSpacing:-0.5, whiteSpace:"nowrap" }} />
-              <span style={{ fontSize:14, fontWeight:700, color:"rgba(255,255,255,0.9)" }}>円</span>
+      {/* KPI cards — 縦積み3行 */}
+      {(() => {
+        const [kSales, kExp, kOp, kAr] = gradKpis; // 今月の売上, 今月経費, 営業利益, 売掛残高
+        const GCard = ({ c, amtSize=18, pad="18px 16px", style={} }) => (
+          <div style={{ background:c.grad, borderRadius:16, padding:pad, boxShadow:"0 4px 16px rgba(0,0,0,0.12)", position:"relative", overflow:"hidden", ...style }}>
+            <div style={{ position:"absolute", right:-16, top:-16, width:90, height:90, borderRadius:"50%", background:"rgba(255,255,255,0.07)" }}/>
+            <div style={{ fontSize:10, color:"rgba(255,255,255,0.7)", fontWeight:700, marginBottom:10, letterSpacing:0.3 }}>{c.label}</div>
+            <div style={{ display:"flex", alignItems:"baseline", gap:3, marginBottom:8 }}>
+              <N v={c.v.replace("円","")} modal={c.modal} setModal={setModal} style={{ fontSize:amtSize, fontWeight:900, color:"#fff", letterSpacing:-1, whiteSpace:"nowrap" }} />
+              <span style={{ fontSize:Math.round(amtSize*0.72), fontWeight:700, color:"rgba(255,255,255,0.88)" }}>円</span>
             </div>
             <div style={{ fontSize:13, color:"rgba(255,255,255,0.85)" }}>{c.sub}</div>
           </div>
-        ))}
-        {plainKpis.map((c,i) => (
-          <div key={i} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:16, padding:"18px 16px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
-            <div style={{ fontSize:10, color:"#999", fontWeight:700, marginBottom:10 }}>{c.label}</div>
-            <div style={{ display:"flex", alignItems:"baseline", gap:2, marginBottom:6 }}>
-              <N v={c.v.replace("円","")} modal={c.modal} setModal={setModal} style={{ fontSize:18, fontWeight:900, color:c.color, letterSpacing:-0.5, whiteSpace:"nowrap" }} />
-              <span style={{ fontSize:14, fontWeight:700, color:c.color }}>円</span>
+        );
+        return (
+          <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:20 }}>
+            {/* 行1: 今月の売上(flex:2) + 売掛残高(flex:1) */}
+            <div style={{ display:"flex", gap:12 }}>
+              <GCard c={kSales} style={{ flex:2 }} />
+              <GCard c={kAr}    style={{ flex:1 }} />
             </div>
-            <div style={{ fontSize:13, color:"#888" }}>{c.sub}</div>
+            {/* 行2: 今月経費 */}
+            <GCard c={kExp} style={{ width:"100%" }} />
+            {/* 行3: 営業利益 — 一番大きく */}
+            <GCard c={kOp} amtSize={36} pad="24px 22px" style={{ width:"100%" }} />
           </div>
-        ))}
-      </div>
+        );
+      })()}
 
       {/* Charts row */}
       <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:20 }}>
