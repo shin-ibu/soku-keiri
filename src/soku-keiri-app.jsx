@@ -265,6 +265,91 @@ function MonthBar({ selMonth, setSelMonth, fiscalMonths }) {
   );
 }
 
+// ── CHART HELPERS ─────────────────────────────────────────────────────────────
+const fmtK = (n) => n >= 1000000 ? (n/1000000).toFixed(1)+"M" : n >= 1000 ? Math.round(n/1000)+"K" : String(Math.round(n));
+
+function LineChart({ months, salesData, expData }) {
+  const VW = 500, VH = 190;
+  const PL = 46, PR = 10, PT = 16, PB = 28;
+  const CW = VW - PL - PR, CH = VH - PT - PB;
+  const maxV = Math.max(...salesData, ...expData, 1);
+  const toX = (i) => PL + (i / (months.length - 1)) * CW;
+  const toY = (v) => PT + CH - (v / maxV) * CH;
+  const gridVals = [0, 0.33, 0.66, 1];
+  const salesPts = salesData.map((v,i) => `${toX(i)},${toY(v)}`).join(" ");
+  const expPts   = expData.map((v,i)   => `${toX(i)},${toY(v)}`).join(" ");
+  const salesArea = `M${toX(0)},${toY(salesData[0])} ${salesData.map((v,i)=>`L${toX(i)},${toY(v)}`).join(" ")} L${toX(salesData.length-1)},${PT+CH} L${toX(0)},${PT+CH} Z`;
+  const expArea   = `M${toX(0)},${toY(expData[0])}   ${expData.map((v,i)=>`L${toX(i)},${toY(v)}`).join(" ")}   L${toX(expData.length-1)},${PT+CH} L${toX(0)},${PT+CH} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" style={{ display:"block" }}>
+      <defs>
+        <linearGradient id="gradS" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1a6fd4" stopOpacity="0.18"/><stop offset="100%" stopColor="#1a6fd4" stopOpacity="0"/></linearGradient>
+        <linearGradient id="gradE" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#EF9F27" stopOpacity="0.14"/><stop offset="100%" stopColor="#EF9F27" stopOpacity="0"/></linearGradient>
+      </defs>
+      {gridVals.map((r,i) => {
+        const y = PT + CH - r * CH;
+        return <g key={i}>
+          <line x1={PL} y1={y} x2={PL+CW} y2={y} stroke="#edf0f7" strokeWidth={1}/>
+          <text x={PL-4} y={y+4} textAnchor="end" fontSize={9} fill="#ccc">{fmtK(maxV*r)}</text>
+        </g>;
+      })}
+      {months.map((m,i) => (
+        <text key={i} x={toX(i)} y={VH-6} textAnchor="middle" fontSize={9} fill="#bbb">{m.replace(/\d{4}年/,"")}</text>
+      ))}
+      <path d={salesArea} fill="url(#gradS)"/>
+      <path d={expArea}   fill="url(#gradE)"/>
+      <polyline points={salesPts} fill="none" stroke="#1a6fd4" strokeWidth={2.2} strokeLinejoin="round"/>
+      <polyline points={expPts}   fill="none" stroke="#EF9F27" strokeWidth={2.2} strokeLinejoin="round"/>
+      {salesData.map((v,i) => <circle key={i} cx={toX(i)} cy={toY(v)} r={3.5} fill="#fff" stroke="#1a6fd4" strokeWidth={2}/>)}
+      {expData.map((v,i)   => <circle key={i} cx={toX(i)} cy={toY(v)} r={3.5} fill="#fff" stroke="#EF9F27" strokeWidth={2}/>)}
+    </svg>
+  );
+}
+
+function BarChart({ months, profitData }) {
+  const VW = 300, VH = 190;
+  const PL = 42, PR = 8, PT = 16, PB = 28;
+  const CW = VW - PL - PR, CH = VH - PT - PB;
+  const minV = Math.min(...profitData, 0);
+  const maxV = Math.max(...profitData, 1);
+  const range = maxV - minV || 1;
+  const toY = (v) => PT + CH - ((v - minV) / range) * CH;
+  const zeroY = toY(0);
+  const n = months.length;
+  const slot = CW / n;
+  const bw = slot * 0.55;
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" style={{ display:"block" }}>
+      <line x1={PL} y1={zeroY} x2={PL+CW} y2={zeroY} stroke="#e8ecf3" strokeWidth={1}/>
+      {[0, 0.5, 1].map((r,i) => {
+        const v = minV + r * range;
+        const y = toY(v);
+        return <g key={i}>
+          <line x1={PL} y1={y} x2={PL+CW} y2={y} stroke="#f2f4f9" strokeWidth={1}/>
+          <text x={PL-4} y={y+4} textAnchor="end" fontSize={9} fill="#ccc">{fmtK(v)}</text>
+        </g>;
+      })}
+      {profitData.map((v,i) => {
+        const x = PL + i * slot + (slot - bw) / 2;
+        const top = toY(Math.max(v,0)), bot = toY(Math.min(v,0));
+        const h = Math.max(bot - top, 2);
+        return <g key={i}>
+          <defs>
+            <linearGradient id={`bg${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={v>=0?"#2ecc8f":"#f09595"}/>
+              <stop offset="100%" stopColor={v>=0?"#0F6E56":"#A32D2D"}/>
+            </linearGradient>
+          </defs>
+          <rect x={x} y={top} width={bw} height={h} fill={`url(#bg${i})`} rx={3}/>
+          <text x={x+bw/2} y={VH-6} textAnchor="middle" fontSize={9} fill="#bbb">{months[i].replace(/\d{4}年/,"")}</text>
+        </g>;
+      })}
+    </svg>
+  );
+}
+
 // ── DONUT CHART ───────────────────────────────────────────────────────────────
 function DonutChart({ sales, expenses, size, setModal, val }) {
   const sz = size || 240;
@@ -355,77 +440,96 @@ export default function App() {
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
-function HomeScreen({ setScreen, taxMode, totalSales, totalExp, opProfit, netProfit, ar, ap, val, sales, expenses, selMonth, setSelMonth, setModal, curSales, curExp, grossProfit, taxAmt, genka, sga, taxRate, fiscalMonths, master }) {
+function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, ap, val, sales, expenses, selMonth, setModal, curSales, curExp, grossProfit, taxAmt, genka, sga, taxRate, fiscalMonths, master }) {
   const arCount = sales.filter(s=>s.status==="未入金").length;
   const apCount = expenses.filter(e=>e.status==="未払い").length;
   const fiscalIdx = fiscalMonths.indexOf(selMonth);
   const fiscalLabel = fiscalIdx >= 0 ? `第${master.company.fiscalNum || 1}期 ${fiscalIdx+1}ヶ月目` : "";
 
-  const kpis = [
-    { label:"今月売上",     v:val(totalSales), color:"#0F6E56", sub:"売上合計",                   modal:{ title:`${selMonth}　売上合計`,    amount:val(totalSales), color:"#0F6E56", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"区分":r.type,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
-    { label:"今月経費",     v:val(totalExp),   color:"#444",    sub:"経費合計",                   modal:{ title:`${selMonth}　経費合計`,    amount:val(totalExp),   formula:`売上原価 ${val(genka)}\n＋ 販管費合計 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
-    { label:"営業利益",     v:val(opProfit),   color:"#185FA5", sub:`利益率 ${totalSales?Math.round(opProfit/totalSales*100):0}%`, modal:{ title:"営業利益", amount:val(opProfit), color:"#185FA5", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。" }},
-    { label:"予定経常利益", v:val(netProfit),  color:netProfit>=0?"#0F6E56":"#A32D2D", sub:`納税${taxRate}%控除後`, modal:{ title:"予定経常利益", amount:val(netProfit), color:"#0F6E56", formula:`営業利益 ${val(opProfit)}\nー 予定納税（${taxRate}%） ${val(taxAmt)}\n＝ 予定経常利益 ${val(netProfit)}` }},
-    { label:"売掛残高",     v:val(ar),         color:"#854F0B", sub:`${arCount}件 未入金`,         modal:{ title:"売掛残高（未入金合計）",  amount:val(ar),         color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }},
-    { label:"買掛残高",     v:val(ap),         color:"#A32D2D", sub:`${apCount}件 未払い`,         modal:{ title:"買掛残高（未払い合計）",  amount:val(ap),         color:"#A32D2D", rows:expenses.filter(e=>e.status==="未払い").map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })), note:`${apCount}件が未払いです。` }},
+  // chart data (6 months)
+  const ms6 = fiscalMonths.slice(0, 6);
+  const salesData  = ms6.map(m => sales.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
+  const expData    = ms6.map(m => expenses.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
+  const profitData = salesData.map((v,i) => v - expData[i]);
+
+  // 4 gradient cards + 2 plain cards
+  const gradKpis = [
+    { label:"今月売上",   v:val(totalSales), sub:`${curSales.length}件`,            grad:"linear-gradient(135deg,#1a6fd4,#4a9fe4)", modal:{ title:`${selMonth}　売上合計`,   amount:val(totalSales), color:"#1a6fd4", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
+    { label:"今月経費",   v:val(totalExp),   sub:`${curExp.length}件`,              grad:"linear-gradient(135deg,#EF9F27,#f4c05a)", modal:{ title:`${selMonth}　経費合計`,   amount:val(totalExp),   color:"#EF9F27", formula:`売上原価 ${val(genka)}\n＋ 販管費 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
+    { label:"営業利益",   v:val(opProfit),   sub:`利益率 ${totalSales?Math.round(opProfit/totalSales*100):0}%`, grad:"linear-gradient(135deg,#0F6E56,#2ecc8f)", modal:{ title:"営業利益", amount:val(opProfit), color:"#0F6E56", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。" }},
+    { label:"売掛残高",   v:val(ar),         sub:`${arCount}件 未入金`,             grad:"linear-gradient(135deg,#854F0B,#c47a2e)", modal:{ title:"売掛残高",               amount:val(ar),         color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }},
+  ];
+  const plainKpis = [
+    { label:"予定経常利益", v:val(netProfit), color:netProfit>=0?"#0F6E56":"#A32D2D", sub:`納税${taxRate}%控除後`, modal:{ title:"予定経常利益", amount:val(netProfit), color:"#0F6E56", formula:`営業利益 ${val(opProfit)}\nー 予定納税（${taxRate}%） ${val(taxAmt)}\n＝ 予定経常利益 ${val(netProfit)}` }},
+    { label:"買掛残高",     v:val(ap),        color:"#A32D2D",                        sub:`${apCount}件 未払い`,    modal:{ title:"買掛残高",               amount:val(ap),         color:"#A32D2D", rows:expenses.filter(e=>e.status==="未払い").map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })), note:`${apCount}件が未払いです。` }},
   ];
 
   return (
-    <div style={{ padding:"28px 28px 40px" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:22 }}>
+    <div style={{ padding:"24px 24px 40px" }}>
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
         <div>
           <div style={{ fontSize:22, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>ダッシュボード</div>
-          {fiscalLabel && <div style={{ fontSize:12, color:"#aaa", marginTop:3 }}>{selMonth}　{fiscalLabel}</div>}
+          {fiscalLabel && <div style={{ fontSize:12, color:"#aaa", marginTop:2 }}>{selMonth}　{fiscalLabel}</div>}
         </div>
         <div style={{ fontSize:12, color:"#bbb" }}>{master.company.name || "会社名未設定"}</div>
       </div>
 
-      {/* 6 KPI cards */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:12, marginBottom:20 }}>
-        {kpis.map((c,i) => (
-          <div key={i} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"16px 14px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
-            <div style={{ fontSize:10, color:"#999", fontWeight:600, marginBottom:8 }}>{c.label}</div>
-            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:17, fontWeight:900, color:c.color, display:"block", marginBottom:5, letterSpacing:-0.5, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} />
+      {/* KPI row: 4 gradient + 2 plain */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr) repeat(2,1fr)", gap:12, marginBottom:20 }}>
+        {gradKpis.map((c,i) => (
+          <div key={i} style={{ background:c.grad, borderRadius:16, padding:"18px 16px", boxShadow:"0 4px 16px rgba(0,0,0,0.12)", position:"relative", overflow:"hidden" }}>
+            <div style={{ position:"absolute", right:-14, top:-14, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.08)" }}/>
+            <div style={{ fontSize:10, color:"rgba(255,255,255,0.75)", fontWeight:700, marginBottom:10, letterSpacing:0.3 }}>{c.label}</div>
+            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:18, fontWeight:900, color:"#fff", display:"block", marginBottom:6, letterSpacing:-0.5, whiteSpace:"nowrap" }} />
+            <div style={{ fontSize:10, color:"rgba(255,255,255,0.6)" }}>{c.sub}</div>
+          </div>
+        ))}
+        {plainKpis.map((c,i) => (
+          <div key={i} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:16, padding:"18px 16px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+            <div style={{ fontSize:10, color:"#999", fontWeight:700, marginBottom:10 }}>{c.label}</div>
+            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:18, fontWeight:900, color:c.color, display:"block", marginBottom:6, letterSpacing:-0.5, whiteSpace:"nowrap" }} />
             <div style={{ fontSize:10, color:"#bbb" }}>{c.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Chart + Menu */}
-      <div style={{ display:"grid", gridTemplateColumns:"240px 1fr", gap:20 }}>
-        {/* Left: donut chart */}
-        <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"20px", display:"flex", flexDirection:"column", alignItems:"center", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
-          <div style={{ fontSize:11, color:"#999", fontWeight:600, marginBottom:14, alignSelf:"flex-start" }}>売上 vs 経費</div>
-          <DonutChart sales={totalSales} expenses={totalExp} size={160} setModal={setModal} val={val} />
-          <div style={{ display:"flex", gap:16, marginTop:14 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-              <div style={{ width:9, height:9, borderRadius:2, background:"#1a6fd4" }} />
-              <span style={{ fontSize:11, color:"#999" }}>売上</span>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-              <div style={{ width:9, height:9, borderRadius:2, background:"#f09595" }} />
-              <span style={{ fontSize:11, color:"#999" }}>経費</span>
+      {/* Charts row */}
+      <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:20 }}>
+        {/* Line chart */}
+        <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:16, padding:"18px 20px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#333" }}>売上・経費トレンド（6ヶ月）</div>
+            <div style={{ display:"flex", gap:14 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:5 }}><div style={{ width:12, height:3, borderRadius:2, background:"#1a6fd4" }}/><span style={{ fontSize:10, color:"#999" }}>売上</span></div>
+              <div style={{ display:"flex", alignItems:"center", gap:5 }}><div style={{ width:12, height:3, borderRadius:2, background:"#EF9F27" }}/><span style={{ fontSize:10, color:"#999" }}>経費</span></div>
             </div>
           </div>
+          <LineChart months={ms6} salesData={salesData} expData={expData} />
         </div>
 
-        {/* Right: quick actions */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, alignContent:"start" }}>
-          {[
-            { id:"sales",    icon:"↑", label:"売上入力",   sub:"日次の売上を記録",     bg:"#E1F5EE", ic:"#0F6E56" },
-            { id:"expenses", icon:"↓", label:"経費入力",   sub:"経費・支払いを記録",   bg:"#FAECE7", ic:"#993C1D" },
-            { id:"pl",       icon:"≡", label:"損益計算書", sub:"12ヶ月の損益を確認",   bg:"#E6F1FB", ic:"#185FA5" },
-            { id:"ar",       icon:"◎", label:"売掛・買掛", sub:"入金・支払いの消込",   bg:"#FAEEDA", ic:"#854F0B" },
-            { id:"cashflow", icon:"⇄", label:"資金繰り",   sub:"キャッシュフロー確認", bg:"#EEEDFE", ic:"#534AB7" },
-            { id:"master",   icon:"⚙", label:"マスター",   sub:"会社情報・科目設定",   bg:"#f0f0f0", ic:"#555" },
-          ].map(m => (
-            <button key={m.id} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"18px 14px", textAlign:"center", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:8, boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }} onClick={() => setScreen(m.id)}>
-              <div style={{ width:44, height:44, borderRadius:11, background:m.bg, color:m.ic, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:700 }}>{m.icon}</div>
-              <div style={{ fontSize:12, fontWeight:700, color:"#222" }}>{m.label}</div>
-              <div style={{ fontSize:10, color:"#aaa" }}>{m.sub}</div>
-            </button>
-          ))}
+        {/* Bar chart */}
+        <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:16, padding:"18px 20px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+          <div style={{ fontSize:12, fontWeight:700, color:"#333", marginBottom:14 }}>月別営業利益</div>
+          <BarChart months={ms6} profitData={profitData} />
         </div>
+      </div>
+
+      {/* Quick actions */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:10 }}>
+        {[
+          { id:"sales",    icon:"↑", label:"売上入力",   bg:"#E1F5EE", ic:"#0F6E56" },
+          { id:"expenses", icon:"↓", label:"経費入力",   bg:"#FAECE7", ic:"#993C1D" },
+          { id:"pl",       icon:"≡", label:"損益計算書", bg:"#E6F1FB", ic:"#185FA5" },
+          { id:"ar",       icon:"◎", label:"売掛・買掛", bg:"#FAEEDA", ic:"#854F0B" },
+          { id:"cashflow", icon:"⇄", label:"資金繰り",   bg:"#EEEDFE", ic:"#534AB7" },
+          { id:"master",   icon:"⚙", label:"マスター",   bg:"#f0f0f0", ic:"#555"    },
+        ].map(m => (
+          <button key={m.id} style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:14, padding:"14px 8px", textAlign:"center", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:7, boxShadow:"0 1px 3px rgba(0,0,0,0.04)" }} onClick={() => setScreen(m.id)}>
+            <div style={{ width:40, height:40, borderRadius:10, background:m.bg, color:m.ic, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, fontWeight:700 }}>{m.icon}</div>
+            <div style={{ fontSize:11, fontWeight:700, color:"#333" }}>{m.label}</div>
+          </button>
+        ))}
       </div>
     </div>
   );
