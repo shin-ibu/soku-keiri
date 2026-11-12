@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 
 const fmt = (n) => "¥" + Math.round(n || 0).toLocaleString("ja-JP");
 const fmtEx = (n) => "¥" + Math.round((n || 0) / 1.1).toLocaleString("ja-JP");
-const today = () => new Date().toISOString().split("T")[0];
+const pad2 = (n) => String(n).padStart(2, "0");
+// 日本の今日（UTCではなく、使っている人の時計で）
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; };
+const monthLabel = (d) => `${d.getFullYear()}年${d.getMonth()+1}月`;
+const monthOfDate = (ymd) => { const [y,m] = String(ymd||"").split("-").map(Number); return y && m ? `${y}年${m}月` : monthLabel(new Date()); };
+const thisMonth = () => monthLabel(new Date());
 
 const getFiscalMonths = (startMonth, year) => {
   const months = [];
@@ -64,6 +69,14 @@ const DEMO_EXP = [
   { id:6, date:"2025-04-01", month:"2025年4月", type:"買掛", client:"〇〇ビル",  account:"地代家賃",   amount:50000,  tax:10, memo:"4月家賃",    status:"支払済" },
   { id:7, date:"2025-04-15", month:"2025年4月", type:"カード", client:"◇◇広告", account:"広告宣伝費", amount:30000,  tax:10, memo:"広告費",    status:"支払済" },
 ];
+
+// 見本データの日付を、開いた日の「今月・先月」に置きかえる（初めて開いた人に、空の画面や去年の数字を見せない）
+const shiftDemo = (rows) => {
+  const now = new Date(); const prev = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const ym = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
+  return rows.map(r => { const isCur = r.month === "2025年5月"; const d = isCur ? now : prev;
+    return { ...r, demo:true, month: monthLabel(d), date: `${ym(d)}-${r.date.slice(8)}`, memo: r.memo.replace("5月", `${now.getMonth()+1}月`).replace("4月", `${prev.getMonth()+1}月`) }; });
+};
 
 const AI_SUGGEST = { "電車":"旅費交通費","タクシー":"旅費交通費","交通":"旅費交通費","出張":"旅費交通費","家賃":"地代家賃","賃料":"地代家賃","広告":"広告宣伝費","チラシ":"広告宣伝費","sns":"広告宣伝費","外注":"外注費","委託":"外注費","フリー":"外注費","スマホ":"通信費","携帯":"通信費","ネット":"通信費","飲食":"交際費","接待":"交際費","ランチ":"交際費","文具":"消耗品費","備品":"消耗品費","adobe":"消耗品費","サブスク":"消耗品費","仕入":"売上原価","材料":"売上原価","保険":"保険料" };
 const getSuggestion = (t) => { const l = t.toLowerCase(); for (const [k,v] of Object.entries(AI_SUGGEST)) { if (l.includes(k)) return v; } return null; };
@@ -391,10 +404,10 @@ export default function App() {
   const saved = load();
   const [screen,      setScreen]      = useState("home");
   const [taxMode,     setTaxMode]     = useState("inc");
-  const [sales,       setSales]       = useState(saved?.sales || DEMO_SALES);
-  const [expenses,    setExpenses]    = useState(saved?.expenses || DEMO_EXP);
+  const [sales,       setSales]       = useState(saved?.sales || shiftDemo(DEMO_SALES));
+  const [expenses,    setExpenses]    = useState(saved?.expenses || shiftDemo(DEMO_EXP));
   const [master,      setMaster]      = useState(saved?.master || DEFAULT_MASTER);
-  const [selMonth,    setSelMonth]    = useState("2025年5月");
+  const [selMonth,    setSelMonth]    = useState(thisMonth());
   const [toast,       setToast]       = useState(null);
   const [modal,       setModal]       = useState(null);
   const [opInvoice,   setOpInvoice]   = useState(false);
@@ -423,6 +436,8 @@ export default function App() {
   const shared = { screen, setScreen, taxMode, setTaxMode, sales, setSales, expenses, setExpenses, master, setMaster, selMonth, setSelMonth, totalSales, totalExp, grossProfit, opProfit, taxAmt, netProfit, ar, ap, val, curSales, curExp, showToast, genka, sga, setModal, opInvoice, showOPModal: () => setShowOPModal(true), fiscalMonths, taxRate };
   const Screens = { home:HomeScreen, sales:SalesScreen, expenses:ExpenseScreen, pl:PLScreen, ar:ARScreen, cashflow:CashflowScreen, invoice:InvoiceScreen, master:MasterScreen };
   const Screen = Screens[screen] || HomeScreen;
+  const hasDemo = sales.some(r=>r.demo) || expenses.some(r=>r.demo);
+  const clearDemo = () => { setSales(p=>p.filter(r=>!r.demo)); setExpenses(p=>p.filter(r=>!r.demo)); setMaster(m=>({ ...m, clients: m.clients.filter(c=>!/[〇□△◇]/.test(c.name)) })); showToast("見本を消しました。自分の数字を入れられます"); };
 
   return (
     <div style={{ fontFamily:"'Hiragino Sans','Noto Sans JP',sans-serif", fontSize:13, display:"flex", minHeight:"100vh" }}>
@@ -432,6 +447,12 @@ export default function App() {
       {showOPModal && <OPModal onClose={() => setShowOPModal(false)} onContract={() => { setOpInvoice(true); setShowOPModal(false); setScreen("invoice"); showToast("請求書オプションを契約しました！"); }} />}
       <Sidebar screen={screen} setScreen={setScreen} taxMode={taxMode} setTaxMode={setTaxMode} opInvoice={opInvoice} showOPModal={() => setShowOPModal(true)} master={master} selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
       <div className="main-area" style={{ marginLeft:240, flex:1, background:"#f4f6fb", minHeight:"100vh", overflowX:"hidden" }}>
+        {hasDemo && (
+          <div className="demo-bar" role="status">
+            <span><b>見本の数字が入っています。</b>どんな画面になるかを見るためのものです。</span>
+            <button onClick={clearDemo}>見本を消して、自分の数字で始める</button>
+          </div>
+        )}
         <Screen {...shared} />
       </div>
       <BottomNav screen={screen} setScreen={setScreen} opInvoice={opInvoice} showOPModal={() => setShowOPModal(true)} />
@@ -447,7 +468,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
   const fiscalLabel = fiscalIdx >= 0 ? `第${master.company.fiscalNum || 1}期 ${fiscalIdx+1}ヶ月目` : "";
 
   // chart data (6 months)
-  const ms6 = fiscalMonths.slice(0, 6);
+  const endIdx = Math.max(fiscalIdx, 0); const ms6 = fiscalMonths.slice(Math.max(0, endIdx-5), Math.max(0, endIdx-5)+6);
   const salesData  = ms6.map(m => sales.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
   const expData    = ms6.map(m => expenses.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
   const profitData = salesData.map((v,i) => v - expData[i]);
@@ -465,7 +486,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
   ];
 
   return (
-    <div style={{ padding:"24px 24px 40px" }}>
+    <div className="screen-wrap" style={{ padding:"24px 24px 40px" }}>
       {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
         <div>
@@ -489,7 +510,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
         return (
           <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:20 }}>
             {/* 行1: 今月の売上(flex:2) + 売掛残高(flex:1) */}
-            <div style={{ display:"flex", gap:12 }}>
+            <div className="kpi-row" style={{ display:"flex", gap:12 }}>
               <GCard c={kSales} style={{ flex:2 }} />
               <GCard c={kAr}    style={{ flex:1 }} />
             </div>
@@ -502,7 +523,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
       })()}
 
       {/* Charts row */}
-      <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:20 }}>
+      <div className="charts-row" style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:20 }}>
         {/* Line chart */}
         <div style={{ background:"#fff", border:"1px solid #e8ecf3", borderRadius:16, padding:"18px 20px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
@@ -523,7 +544,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
       </div>
 
       {/* Quick actions */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:10 }}>
+      <div className="quick-grid" style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:10 }}>
         {[
           { id:"sales",    icon:"↑", label:"売上入力",   bg:"#E1F5EE", ic:"#0F6E56" },
           { id:"expenses", icon:"↓", label:"経費入力",   bg:"#FAECE7", ic:"#993C1D" },
@@ -545,56 +566,57 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
 // ── SALES ─────────────────────────────────────────────────────────────────────
 function SalesScreen({ setScreen, taxMode, setTaxMode, sales, setSales, selMonth, setSelMonth, val, showToast, curSales, setModal, opInvoice, showOPModal, master, fiscalMonths }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ date:today(), month:selMonth, type:"売掛", client:"", amount:"", tax:10, memo:"", status:"未入金" });
+  const [form, setForm] = useState({ date:today(), month:monthOfDate(today()), type:"売掛", client:"", amount:"", tax:10, memo:"", status:"未入金" });
   const [showAlert, setShowAlert] = useState(false);
   const sf = (k,v) => setForm(f=>({...f,[k]:v}));
   const clientOptions = master.clients.map(c=>c.name);
-  const onAmountBlur = () => {
-    if (!form.amount || curSales.length===0) return;
+  // 金額がこの月の平均と大きく違うときは、保存の前に一度だけ確かめる（入力の途中では出さない：ボタンの位置がずれて押し損ねるため）
+  const isOutlier = () => {
+    if (!form.amount || curSales.length===0) return false;
     const avg = curSales.reduce((s,r)=>s+r.amount,0)/curSales.length;
-    if (Number(form.amount)>avg*3||Number(form.amount)<avg*0.2) setShowAlert(true);
+    return Number(form.amount)>avg*3||Number(form.amount)<avg*0.2;
   };
-  const doSave = () => {
+  const doSave = (force) => {
     if (!form.client||!form.amount) { showToast("相手先と金額は必須です","error"); return; }
-    setSales(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount) }]);
-    setShowForm(false); setForm({ date:today(),month:selMonth,type:"売掛",client:"",amount:"",tax:10,memo:"",status:"未入金" });
+    if (force!==true && !showAlert && isOutlier()) { setShowAlert(true); return; }
+    setShowAlert(false);
+    setSales(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount) }]); setSelMonth(form.month);
+    setShowForm(false); setForm({ date:today(),month:monthOfDate(today()),type:"売掛",client:"",amount:"",tax:10,memo:"",status:"未入金" });
     showToast("売上を保存しました");
   };
   const markPaid = (id) => { setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r)); showToast("入金済みにしました"); };
   const total = curSales.reduce((s,r)=>s+r.amount,0);
   return (
-    <div style={s.screenWrap}>
+    <div className="screen-wrap" style={s.screenWrap}>
       <div style={s.pageHeader}><div style={s.pageTitle}>売上入力</div><button style={s.btnP} onClick={()=>setShowForm(true)}>＋ 新規入力</button></div>
       <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
       {showForm && (
         <div style={s.formCard}>
           <div style={s.formTitle}>売上を入力する</div>
-          <div style={s.formGrid}>
-            <FR label="日付"><input type="date" style={s.inp} value={form.date} onChange={e=>sf("date",e.target.value)} /></FR>
+          <div className="form-grid" style={s.formGrid}>
+            <FR label="日付"><input type="date" style={s.inp} value={form.date} onChange={e=>{ const v=e.target.value; setForm(f=>({ ...f, date:v, month: fiscalMonths.includes(monthOfDate(v)) ? monthOfDate(v) : f.month })); }} /></FR>
             <FR label="反映月" hint={"この売上は何月の仕事ですか？\n例）3月納品 → 3月　4月に請求しても3月と入力"}>
               <select style={s.inp} value={form.month} onChange={e=>sf("month",e.target.value)}>{fiscalMonths.map(m=><option key={m}>{m}</option>)}</select>
             </FR>
             <FR label="区分"><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","売掛","カード"].map(t=><option key={t}>{t}</option>)}</select></FR>
             <FR label="相手先">
-              <select style={s.inp} value={form.client} onChange={e=>sf("client",e.target.value)}>
-                <option value="">選択または直接入力</option>
-                {clientOptions.map(c=><option key={c}>{c}</option>)}
-              </select>
+              <input style={s.inp} list="sales-clients" value={form.client} onChange={e=>sf("client",e.target.value)} placeholder="選ぶか、そのまま入力" />
+              <datalist id="sales-clients">{clientOptions.map(c=><option key={c} value={c} />)}</datalist>
             </FR>
-            <FR label="金額（税込）"><input type="number" style={s.inp} value={form.amount} onChange={e=>sf("amount",e.target.value)} onBlur={onAmountBlur} placeholder="110000" /></FR>
+            <FR label="金額（税込）"><input type="number" style={s.inp} value={form.amount} onChange={e=>sf("amount",e.target.value)} placeholder="110000" /></FR>
             <FR label="税率"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>10%（標準）</option><option value={8}>8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
             <FR label="備考"><input style={s.inp} value={form.memo} onChange={e=>sf("memo",e.target.value)} placeholder="Web制作費 5月分など" /></FR>
           </div>
-          {showAlert && <div style={s.alertBox}>⚠ 先月の平均と大きく異なります。金額を確認してください。<button style={s.alertDis} onClick={()=>setShowAlert(false)}>確認しました</button></div>}
-          <div style={s.formBtns}><button style={s.btnS} onClick={()=>setShowForm(false)}>キャンセル</button><button style={s.btnP} onClick={doSave}>保存する</button></div>
+          {showAlert && <div style={s.alertBox} role="alert">⚠ この月のほかの金額と大きく違います。金額が合っていれば、もう一度「保存する」を押してください。</div>}
+          <div style={s.formBtns}><button style={s.btnS} onClick={()=>setShowForm(false)}>キャンセル</button><button style={s.btnP} onClick={()=>doSave(showAlert)}>保存する</button></div>
         </div>
       )}
       <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:8, gap:6, alignItems:"center" }}>
         <span style={{ fontSize:12, color:"#aaa" }}>合計</span>
         <N v={val(total)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#0F6E56" }} modal={{ title:`${selMonth}　売上合計`, amount:val(total), color:"#0F6E56", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"区分":r.type,"金額":val(r.amount),"状態":r.status })) }} />
       </div>
-      <div style={s.tblWrap}>
-        <table style={s.tbl}>
+      <div className="tbl-wrap" style={s.tblWrap}>
+        <table className="t-sales" style={s.tbl}>
           <thead><tr>{["日付","反映月","相手先","区分","金額","税率","備考","状態",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
           <tbody>
             {curSales.length===0 ? <tr><td colSpan={9} style={{ ...s.td, textAlign:"center", color:"#bbb", padding:32 }}>まだ売上データがありません</td></tr>
@@ -607,7 +629,7 @@ function SalesScreen({ setScreen, taxMode, setTaxMode, sales, setSales, selMonth
                 <td style={{ ...s.td, textAlign:"center" }}>{r.tax}%</td>
                 <td style={{ ...s.td, color:"#aaa" }}>{r.memo}</td>
                 <td style={s.td}><span style={{ ...s.badge, ...(r.status==="入金済"?s.bGreen:s.bAmber) }}>{r.status}</span></td>
-                <td style={s.td}>{r.status==="未入金"&&<button style={s.paidBtn} onClick={()=>markPaid(r.id)}>入金済</button>}</td>
+                <td style={{ ...s.td, whiteSpace:"nowrap" }}>{r.status==="未入金"&&<button style={s.paidBtn} onClick={()=>markPaid(r.id)}>入金済にする</button>} <button style={s.delBtn} aria-label={`${r.client}の売上を消す`} onClick={()=>{ if (window.confirm(`${r.client} ${fmt(r.amount)} を消します。よろしいですか？`)) { setSales(p=>p.filter(x=>x.id!==r.id)); showToast("消しました"); } }}>消す</button></td>
               </tr>
             ))}
           </tbody>
@@ -620,36 +642,38 @@ function SalesScreen({ setScreen, taxMode, setTaxMode, sales, setSales, selMonth
 // ── EXPENSES ──────────────────────────────────────────────────────────────────
 function ExpenseScreen({ expenses, setExpenses, selMonth, setSelMonth, val, showToast, curExp, setModal, master, fiscalMonths }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ date:today(), month:selMonth, type:"現金", client:"", account:"", amount:"", tax:10, memo:"", status:"未払い" });
+  const [form, setForm] = useState({ date:today(), month:monthOfDate(today()), type:"現金", client:"", account:"", amount:"", tax:10, memo:"", status:"未払い" });
   const [freeText, setFreeText] = useState("");
   const [suggestion, setSuggestion] = useState(null);
   const [showAlert, setShowAlert] = useState(false);
   const sf = (k,v) => setForm(f=>({...f,[k]:v}));
   const onFree = (v) => { setFreeText(v); const sug=getSuggestion(v); setSuggestion(sug); if(sug) sf("account",sug); };
-  const onAmountBlur = () => {
-    if (!form.amount||curExp.length===0) return;
+  const isOutlier = () => {
+    if (!form.amount||curExp.length===0) return false;
     const avg = curExp.reduce((s,r)=>s+r.amount,0)/curExp.length;
-    if (Number(form.amount)>avg*3||Number(form.amount)<avg*0.1) setShowAlert(true);
+    return Number(form.amount)>avg*3||Number(form.amount)<avg*0.1;
   };
-  const doSave = () => {
+  const doSave = (force) => {
     if (!form.client||!form.amount||!form.account) { showToast("相手先・科目・金額は必須です","error"); return; }
-    setExpenses(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount) }]);
+    if (force!==true && !showAlert && isOutlier()) { setShowAlert(true); return; }
+    setShowAlert(false);
+    setExpenses(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount) }]); setSelMonth(form.month);
     setShowForm(false); setFreeText(""); setSuggestion(null);
-    setForm({ date:today(),month:selMonth,type:"現金",client:"",account:"",amount:"",tax:10,memo:"",status:"未払い" });
+    setForm({ date:today(),month:monthOfDate(today()),type:"現金",client:"",account:"",amount:"",tax:10,memo:"",status:"未払い" });
     showToast("経費を保存しました");
   };
   const markPaid = (id) => { setExpenses(p=>p.map(e=>e.id===id?{...e,status:"支払済"}:e)); showToast("支払済みにしました"); };
   const total = curExp.reduce((s,r)=>s+r.amount,0);
   const accountOptions = master.accounts.filter(a=>a.category!=="revenue");
   return (
-    <div style={s.screenWrap}>
+    <div className="screen-wrap" style={s.screenWrap}>
       <div style={s.pageHeader}><div style={s.pageTitle}>経費入力</div><button style={s.btnP} onClick={()=>setShowForm(true)}>＋ 新規入力</button></div>
       <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />
       {showForm && (
         <div style={s.formCard}>
           <div style={s.formTitle}>経費を入力する</div>
-          <div style={s.formGrid}>
-            <FR label="日付"><input type="date" style={s.inp} value={form.date} onChange={e=>sf("date",e.target.value)} /></FR>
+          <div className="form-grid" style={s.formGrid}>
+            <FR label="日付"><input type="date" style={s.inp} value={form.date} onChange={e=>{ const v=e.target.value; setForm(f=>({ ...f, date:v, month: fiscalMonths.includes(monthOfDate(v)) ? monthOfDate(v) : f.month })); }} /></FR>
             <FR label="反映月" hint={"この経費は何月分ですか？\n例）4月の家賃を5月に払う場合 → 4月と入力"}>
               <select style={s.inp} value={form.month} onChange={e=>sf("month",e.target.value)}>{fiscalMonths.map(m=><option key={m}>{m}</option>)}</select>
             </FR>
@@ -667,19 +691,19 @@ function ExpenseScreen({ expenses, setExpenses, selMonth, setSelMonth, val, show
             </FR>
             <FR label="区分"><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t}>{t}</option>)}</select></FR>
             <FR label="相手先"><input style={s.inp} value={form.client} onChange={e=>sf("client",e.target.value)} placeholder="〇〇ビルなど" /></FR>
-            <FR label="金額（税込）"><input type="number" style={s.inp} value={form.amount} onChange={e=>sf("amount",e.target.value)} onBlur={onAmountBlur} placeholder="50000" /></FR>
+            <FR label="金額（税込）"><input type="number" style={s.inp} value={form.amount} onChange={e=>sf("amount",e.target.value)} placeholder="50000" /></FR>
             <FR label="税率"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>10%（標準）</option><option value={8}>8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
           </div>
-          {showAlert && <div style={s.alertBox}>⚠ 先月の平均と大きく異なります。金額を確認してください。<button style={s.alertDis} onClick={()=>setShowAlert(false)}>確認しました</button></div>}
-          <div style={s.formBtns}><button style={s.btnS} onClick={()=>setShowForm(false)}>キャンセル</button><button style={s.btnP} onClick={doSave}>保存する</button></div>
+          {showAlert && <div style={s.alertBox} role="alert">⚠ この月のほかの金額と大きく違います。金額が合っていれば、もう一度「保存する」を押してください。</div>}
+          <div style={s.formBtns}><button style={s.btnS} onClick={()=>setShowForm(false)}>キャンセル</button><button style={s.btnP} onClick={()=>doSave(showAlert)}>保存する</button></div>
         </div>
       )}
       <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:8, gap:6, alignItems:"center" }}>
         <span style={{ fontSize:12, color:"#aaa" }}>合計</span>
         <N v={val(total)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#A32D2D" }} modal={{ title:`${selMonth}　経費合計`, amount:val(total), color:"#A32D2D", rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount),"状態":r.status })) }} />
       </div>
-      <div style={s.tblWrap}>
-        <table style={s.tbl}>
+      <div className="tbl-wrap" style={s.tblWrap}>
+        <table className="t-exp" style={s.tbl}>
           <thead><tr>{["日付","反映月","相手先","勘定科目","区分","金額","備考","状態",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
           <tbody>
             {curExp.length===0 ? <tr><td colSpan={9} style={{ ...s.td, textAlign:"center", color:"#bbb", padding:32 }}>まだ経費データがありません</td></tr>
@@ -692,7 +716,7 @@ function ExpenseScreen({ expenses, setExpenses, selMonth, setSelMonth, val, show
                 <td style={{ ...s.td, textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700 }} modal={{ title:`${r.client} / ${r.account}`, amount:val(r.amount), formula:`税込 ${fmt(r.amount)}\n勘定科目：${r.account}\n区分：${r.type}`, rows:[{ "相手先":r.client,"日付":r.date,"反映月":r.month,"科目":r.account,"備考":r.memo||"—","状態":r.status }] }} /></td>
                 <td style={{ ...s.td, color:"#aaa" }}>{r.memo}</td>
                 <td style={s.td}><span style={{ ...s.badge, ...(r.status==="支払済"?s.bGreen:s.bRed) }}>{r.status}</span></td>
-                <td style={s.td}>{r.status==="未払い"&&<button style={{ ...s.paidBtn, borderColor:"#f09595", color:"#A32D2D" }} onClick={()=>markPaid(r.id)}>支払済</button>}</td>
+                <td style={{ ...s.td, whiteSpace:"nowrap" }}>{r.status==="未払い"&&<button style={{ ...s.paidBtn, borderColor:"#f09595", color:"#A32D2D" }} onClick={()=>markPaid(r.id)}>支払済にする</button>} <button style={s.delBtn} aria-label={`${r.client}の経費を消す`} onClick={()=>{ if (window.confirm(`${r.client} ${fmt(r.amount)} を消します。よろしいですか？`)) { setExpenses(p=>p.filter(x=>x.id!==r.id)); showToast("消しました"); } }}>消す</button></td>
               </tr>
             ))}
           </tbody>
@@ -738,7 +762,7 @@ function PLScreen({ selMonth, setSelMonth, val, totalSales, genka, grossProfit, 
   const rows = viewMode==="annual" ? annualRows : monthlyRows;
 
   return (
-    <div style={s.screenWrap}>
+    <div className="screen-wrap" style={s.screenWrap}>
       <div style={s.pageHeader}>
         <div>
           <div style={s.pageTitle}>損益計算書</div>
@@ -785,7 +809,7 @@ function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setM
   const mS=(id)=>{setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r));showToast("入金済みにしました");};
   const mE=(id)=>{setExpenses(p=>p.map(e=>e.id===id?{...e,status:"支払済"}:e));showToast("支払済みにしました");};
   return (
-    <div style={s.screenWrap}>
+    <div className="screen-wrap" style={s.screenWrap}>
       <div style={s.pageHeader}><div style={s.pageTitle}>売掛・買掛管理</div></div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
         <div>
@@ -793,24 +817,24 @@ function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setM
             <div style={s.secTitle}>売掛（未入金）</div>
             <N v={val(arT)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#854F0B" }} modal={{ title:"売掛残高", amount:val(arT), color:"#854F0B", rows:unpS.map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })) }} />
           </div>
-          <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額","区分",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
+          <div className="tbl-wrap" style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額","区分",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
             {unpS.length===0?<tr><td colSpan={4} style={{ ...s.td,textAlign:"center",color:"#bbb",padding:20 }}>✓ 未入金なし</td></tr>
             :unpS.map(r=><tr key={r.id} style={s.tr}><td style={{ ...s.td,fontWeight:500 }}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700,color:"#854F0B" }} modal={{ title:`${r.client}　未入金`,amount:val(r.amount),color:"#854F0B",rows:[{ "相手先":r.client,"反映月":r.month,"区分":r.type,"備考":r.memo||"—" }],note:"「入金済」ボタンで消込できます。" }} /></td><td style={s.td}><span style={{ ...s.badge,...s.bAmber }}>{r.type}</span></td><td style={s.td}><button style={s.paidBtn} onClick={()=>mS(r.id)}>入金済</button></td></tr>)}
           </tbody></table></div>
           <div style={s.secTitleSub}>入金済（消込済）</div>
-          <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidS.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td><td style={s.td}><span style={{ ...s.badge,...s.bGreen }}>✓ 入金済</span></td></tr>)}</tbody></table></div>
+          <div className="tbl-wrap" style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidS.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td><td style={s.td}><span style={{ ...s.badge,...s.bGreen }}>✓ 入金済</span></td></tr>)}</tbody></table></div>
         </div>
         <div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
             <div style={{ ...s.secTitle,color:"#A32D2D" }}>買掛（未払い）</div>
             <N v={val(apT)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#A32D2D" }} modal={{ title:"買掛残高", amount:val(apT), color:"#A32D2D", rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }} />
           </div>
-          <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
+          <div className="tbl-wrap" style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
             {unpE.length===0?<tr><td colSpan={4} style={{ ...s.td,textAlign:"center",color:"#bbb",padding:20 }}>✓ 未払いなし</td></tr>
             :unpE.map(r=><tr key={r.id} style={s.tr}><td style={{ ...s.td,fontWeight:500 }}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700,color:"#A32D2D" }} modal={{ title:`${r.client}　未払い`,amount:val(r.amount),color:"#A32D2D",rows:[{ "相手先":r.client,"科目":r.account,"備考":r.memo||"—" }],note:"「支払済」ボタンで消込できます。" }} /></td><td style={s.td}><button style={{ ...s.paidBtn,borderColor:"#f09595",color:"#A32D2D" }} onClick={()=>mE(r.id)}>支払済</button></td></tr>)}
           </tbody></table></div>
           <div style={s.secTitleSub}>支払済（消込済）</div>
-          <div style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額"].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidE.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td></tr>)}</tbody></table></div>
+          <div className="tbl-wrap" style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額"].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidE.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td></tr>)}</tbody></table></div>
         </div>
       </div>
     </div>
@@ -833,7 +857,7 @@ function CashflowScreen({ val, sales, expenses, setModal, fiscalMonths }) {
     { label:"月末残高", vals:bal,  color:"#185FA5",bold:true,hl:true,mk:mkBal },
   ];
   return (
-    <div style={s.screenWrap}>
+    <div className="screen-wrap" style={s.screenWrap}>
       <div style={s.pageHeader}><div style={s.pageTitle}>資金繰り表</div><button style={s.btnS}>CSV出力</button></div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:16 }}>
         {[
@@ -843,7 +867,7 @@ function CashflowScreen({ val, sales, expenses, setModal, fiscalMonths }) {
           { l:"直近当月収支", v:(dIn[dIn.length-1]||0)-(dOut[dOut.length-1]||0), c:"#0F6E56", mo:mkBal(ms6.length-1) },
         ].map((c,i)=><div key={i} style={s.statCard}><div style={s.statLabel}>{c.l}</div><N v={val(c.v)} setModal={setModal} modal={c.mo} style={{ color:c.c,fontSize:20,fontWeight:800,display:"block",marginTop:4 }} /></div>)}
       </div>
-      <div style={s.tblWrap}>
+      <div className="tbl-wrap" style={s.tblWrap}>
         <table style={s.tbl}>
           <thead><tr><th style={{ ...s.th,textAlign:"left",width:140 }}>項目</th>{ms6.map(m=><th key={m} style={s.th}>{m}</th>)}</tr></thead>
           <tbody>
@@ -887,7 +911,7 @@ function InvoiceScreen({ screen, setScreen, opInvoice, showOPModal, master, sale
   };
   const doReset=()=>{ setStep(1);setCompleted(false);setForm({ client:"",issueDate:today(),dueDate:"",subject:"" });setItems([{ desc:"",qty:1,unit:"式",price:0 }]); };
   return (
-    <div style={s.screenWrap}>
+    <div className="screen-wrap" style={s.screenWrap}>
       <div style={s.pageHeader}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <div style={s.pageTitle}>請求書作成</div>
@@ -1015,7 +1039,7 @@ function MasterScreen({ master, setMaster, showToast }) {
   };
 
   return (
-    <div style={s.screenWrap}>
+    <div className="screen-wrap" style={s.screenWrap}>
       <div style={s.pageHeader}>
         <div style={s.pageTitle}>マスター設定</div>
         <button style={s.btnP} onClick={saveMaster}>保存する</button>
@@ -1074,7 +1098,7 @@ function MasterScreen({ master, setMaster, showToast }) {
 
       {tab === "accounts" && (
         <div>
-          <div style={s.tblWrap}>
+          <div className="tbl-wrap" style={s.tblWrap}>
             <table style={s.tbl}>
               <thead><tr>{["科目名","分類","使用例",""].map(h=><th key={h} style={{ ...s.th, textAlign:"left" }}>{h}</th>)}</tr></thead>
               <tbody>
@@ -1103,7 +1127,7 @@ function MasterScreen({ master, setMaster, showToast }) {
 
       {tab === "clients" && (
         <div>
-          <div style={s.tblWrap}>
+          <div className="tbl-wrap" style={s.tblWrap}>
             <table style={s.tbl}>
               <thead><tr>{["会社名","住所","銀行","口座番号","名義",""].map(h=><th key={h} style={{ ...s.th, textAlign:"left" }}>{h}</th>)}</tr></thead>
               <tbody>
@@ -1176,6 +1200,7 @@ const s = {
   formBtns:     { display:"flex", gap:10, marginTop:14, justifyContent:"flex-end" },
   btnP:         { padding:"9px 22px", borderRadius:8, border:"none", background:"#1a6fd4", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" },
   btnS:         { padding:"9px 16px", borderRadius:8, border:"1px solid #dce3f0", background:"#fff", color:"#555", fontSize:13, cursor:"pointer" },
+  delBtn:       { border:"1px solid #e3c9c9", background:"#fff", color:"#A32D2D", borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer" },
   tblWrap:      { background:"#fff", border:"1px solid #e8ecf3", borderRadius:12, overflow:"hidden", marginBottom:14 },
   tbl:          { width:"100%", borderCollapse:"collapse" },
   th:           { background:"#f7f9fc", fontSize:11, fontWeight:600, color:"#aaa", padding:"9px 12px", borderBottom:"1px solid #edf0f7", textAlign:"right", whiteSpace:"nowrap" },
@@ -1203,9 +1228,25 @@ const css = `
   ::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px;}
   .sidebar{flex-shrink:0;}
 
+  .demo-bar{ display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:12px 24px; background:#FFF7E0; border-bottom:1px solid #F0DCA0; color:#5C4300; font-size:13px; line-height:1.6; }
+  .demo-bar button{ border:1px solid #C9A227; background:#fff; color:#5C4300; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; }
+
   @media(max-width:768px){
     .sidebar{ display:none !important; }
     .bottom-nav{ display:flex !important; }
-    .main-area{ margin-left:0 !important; padding-bottom:58px; }
+    .main-area{ margin-left:0 !important; padding-bottom:calc(58px + env(safe-area-inset-bottom,0px)); }
+    .screen-wrap{ padding:18px 14px 32px !important; }
+    .demo-bar{ padding:12px 14px; }
+    .kpi-row{ flex-direction:column; }
+    .charts-row{ grid-template-columns:1fr !important; }
+    .quick-grid{ grid-template-columns:repeat(3,1fr) !important; }
+    .form-grid{ grid-template-columns:1fr !important; }
+    /* 入力欄が16px未満だと、iPhoneでは触るたびに画面が勝手に拡大する */
+    input, select, textarea{ font-size:16px !important; min-height:44px; }
+    .tbl-wrap{ overflow-x:auto !important; -webkit-overflow-scrolling:touch; }
+    /* スマホの一覧は、日付・相手先・区分・金額・状態だけ見せる（反映月・税率・備考は隠す） */
+    .t-sales th:nth-child(2), .t-sales td:nth-child(2), .t-sales th:nth-child(4), .t-sales td:nth-child(4), .t-sales th:nth-child(6), .t-sales td:nth-child(6), .t-sales th:nth-child(7), .t-sales td:nth-child(7),
+    .t-exp th:nth-child(2), .t-exp td:nth-child(2), .t-exp th:nth-child(5), .t-exp td:nth-child(5), .t-exp th:nth-child(7), .t-exp td:nth-child(7){ display:none; }
+    .t-sales th, .t-sales td, .t-exp th, .t-exp td{ padding-left:8px !important; padding-right:8px !important; }
   }
 `;
