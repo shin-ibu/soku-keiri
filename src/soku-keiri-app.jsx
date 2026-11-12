@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
-const fmt = (n) => "¥" + Math.round(n || 0).toLocaleString("ja-JP") + "円";
-const fmtEx = (n) => "¥" + Math.round((n || 0) / 1.1).toLocaleString("ja-JP") + "円";
+const fmt = (n) => "¥" + Math.round(n || 0).toLocaleString("ja-JP");
+const fmtEx = (n) => "¥" + Math.round((n || 0) / 1.1).toLocaleString("ja-JP");
 const today = () => new Date().toISOString().split("T")[0];
 
 const getFiscalMonths = (startMonth, year) => {
@@ -454,8 +454,8 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
 
   // 4 gradient cards + 2 plain cards
   const gradKpis = [
-    { label:"今月の売上", v:val(totalSales), sub:`今月の売上件数：${curSales.length}件`,                              grad:"linear-gradient(135deg,#1a6fd4,#4a9fe4)", modal:{ title:`${selMonth}　売上合計`,   amount:val(totalSales), color:"#1a6fd4", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
-    { label:"今月経費",   v:val(totalExp),   sub:`今月の経費件数：${curExp.length}件`,                               grad:"linear-gradient(135deg,#EF9F27,#f4c05a)", modal:{ title:`${selMonth}　経費合計`,   amount:val(totalExp),   color:"#EF9F27", formula:`売上原価 ${val(genka)}\n＋ 販管費 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
+    { label:"今月の売上", v:val(totalSales), sub:`売上件数：${curSales.length}件`,                              grad:"linear-gradient(135deg,#1a6fd4,#4a9fe4)", modal:{ title:`${selMonth}　売上合計`,   amount:val(totalSales), color:"#1a6fd4", rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` }},
+    { label:"今月経費",   v:val(totalExp),   sub:`経費件数：${curExp.length}件`,                               grad:"linear-gradient(135deg,#EF9F27,#f4c05a)", modal:{ title:`${selMonth}　経費合計`,   amount:val(totalExp),   color:"#EF9F27", formula:`売上原価 ${val(genka)}\n＋ 販管費 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }},
     { label:"営業利益",   v:val(opProfit),   sub:`売上利益率：${totalSales?Math.round(opProfit/totalSales*100):0}%`, grad:"linear-gradient(135deg,#0F6E56,#2ecc8f)", modal:{ title:"営業利益", amount:val(opProfit), color:"#0F6E56", formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"本業で稼いだ利益です。" }},
     { label:"売掛残高",   v:val(ar),         sub:`未入金：${arCount}件`,                                             grad:"linear-gradient(135deg,#854F0B,#c47a2e)", modal:{ title:"売掛残高",               amount:val(ar),         color:"#854F0B", rows:sales.filter(s=>s.status==="未入金").map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` }},
   ];
@@ -478,15 +478,12 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
       {/* KPI cards — 縦積み3行 */}
       {(() => {
         const [kSales, kExp, kOp, kAr] = gradKpis; // 今月の売上, 今月経費, 営業利益, 売掛残高
-        const GCard = ({ c, amtSize=18, pad="18px 16px", style={} }) => (
-          <div style={{ background:c.grad, borderRadius:16, padding:pad, boxShadow:"0 4px 16px rgba(0,0,0,0.12)", position:"relative", overflow:"hidden", ...style }}>
+        const GCard = ({ c, amtSize=32, pad="20px", style={} }) => (
+          <div style={{ background:c.grad, borderRadius:16, padding:pad, boxShadow:"0 4px 16px rgba(0,0,0,0.12)", position:"relative", overflow:"hidden", textAlign:"center", ...style }}>
             <div style={{ position:"absolute", right:-16, top:-16, width:90, height:90, borderRadius:"50%", background:"rgba(255,255,255,0.07)" }}/>
-            <div style={{ fontSize:10, color:"rgba(255,255,255,0.7)", fontWeight:700, marginBottom:10, letterSpacing:0.3 }}>{c.label}</div>
-            <div style={{ display:"flex", alignItems:"baseline", gap:3, marginBottom:8 }}>
-              <N v={c.v.replace("円","")} modal={c.modal} setModal={setModal} style={{ fontSize:amtSize, fontWeight:900, color:"#fff", letterSpacing:-1, whiteSpace:"nowrap" }} />
-              <span style={{ fontSize:Math.round(amtSize*0.72), fontWeight:700, color:"rgba(255,255,255,0.88)" }}>円</span>
-            </div>
-            <div style={{ fontSize:13, color:"rgba(255,255,255,0.85)" }}>{c.sub}</div>
+            <div style={{ fontSize:12, color:"rgba(255,255,255,0.8)", fontWeight:600, marginBottom:8 }}>{c.label}</div>
+            <N v={c.v} modal={c.modal} setModal={setModal} style={{ fontSize:amtSize, fontWeight:800, color:"#fff", letterSpacing:-1, whiteSpace:"nowrap" }} />
+            <div style={{ fontSize:13, color:"rgba(255,255,255,0.75)", marginTop:8 }}>{c.sub}</div>
           </div>
         );
         return (
@@ -499,7 +496,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, netProfit, ar, 
             {/* 行2: 今月経費 */}
             <GCard c={kExp} style={{ width:"100%" }} />
             {/* 行3: 営業利益 — 一番大きく */}
-            <GCard c={kOp} amtSize={36} pad="24px 22px" style={{ width:"100%" }} />
+            <GCard c={kOp} amtSize={36} pad="24px" style={{ width:"100%" }} />
           </div>
         );
       })()}
