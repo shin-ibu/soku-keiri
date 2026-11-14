@@ -1538,9 +1538,9 @@ function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMo
     if (!form.client||!form.amount) { showToast("相手先と金額は必須です","error"); return; }
     if (force!==true && !showAlert && isOutlier()) { setShowAlert(true); return; }
     setShowAlert(false);
-    setSales(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount) }]); setSelMonth(form.month);
+    setSales(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "入金済" : "未入金" }]); setSelMonth(form.month);
     setForm({ date:today(),month:monthOfDate(today()),type:"売掛",client:"",amount:"",tax:10,memo:"",status:"未入金" });
-    showToast("売上を保存しました");
+    showToast(form.type==="現金" ? "売上を保存しました（入金済み）" : "売上を保存しました（未入金）");
     if (onDone) onDone();
   };
   return (
@@ -1555,7 +1555,7 @@ function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMo
       </div>
       <FR label="売上の内容"><input style={s.inp} value={form.memo} onChange={e=>sf("memo",e.target.value)} placeholder="Webサイト制作など" /></FR>
       <div className="two">
-        <FR label="入金のしかた"><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","売掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
+        <FR label="入金のしかた" hint={"現金：その場で受け取った → 入金済みで入ります\nあとで入金・カード：まだ受け取っていない → 未入金で入ります"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","売掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
         <FR label="消費税"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>税率 10%（標準）</option><option value={8}>税率 8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
       </div>
       {showAlert && <div style={s.alertBox} role="alert">この月のほかの金額と大きく違います。金額が合っていれば、もう一度「この内容で保存」を押してください。</div>}
@@ -1581,10 +1581,10 @@ function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fisc
     if (!form.client||!form.amount||!form.account) { showToast("相手先・科目・金額は必須です","error"); return; }
     if (force!==true && !showAlert && isOutlier()) { setShowAlert(true); return; }
     setShowAlert(false);
-    setExpenses(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount) }]); setSelMonth(form.month);
+    setExpenses(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "支払済" : "未払い" }]); setSelMonth(form.month);
     setFreeText(""); setSuggestion(null);
     setForm({ date:today(),month:monthOfDate(today()),type:"現金",client:"",account:"",amount:"",tax:10,memo:"",status:"未払い" });
-    showToast("経費を保存しました");
+    showToast(form.type==="現金" ? "経費を保存しました（支払済み）" : "経費を保存しました（未払金）");
     if (onDone) onDone();
   };
   const accountOptions = master.accounts.filter(a=>a.category!=="revenue");
@@ -1609,7 +1609,7 @@ function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fisc
         </div>
       </FR>
       <div className="two">
-        <FR label="支払いのしかた"><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
+        <FR label="支払いのしかた" hint={"現金：その場で払った → 支払済みで入ります\nあとで払う・カード：まだ払っていない → 未払金で入ります"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
         <FR label="消費税"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>税率 10%（標準）</option><option value={8}>税率 8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
       </div>
       {showAlert && <div style={s.alertBox} role="alert">この月のほかの金額と大きく違います。金額が合っていれば、もう一度「この内容で保存」を押してください。</div>}
