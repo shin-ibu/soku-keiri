@@ -730,7 +730,7 @@ function ExpenseScreen({ setExpenses, setSelMonth, selMonth, val, showToast, cur
 }
 
 // ── PL ────────────────────────────────────────────────────────────────────────
-function PLScreen({ selMonth, setSelMonth, val, totalSales, genka, grossProfit, sga, opProfit, curExp, setModal, master, fiscalMonths, sales, expenses }) {
+function PLScreen({ setScreen, selMonth, setSelMonth, val, totalSales, genka, grossProfit, sga, opProfit, curExp, setModal, master, fiscalMonths, sales, expenses }) {
   const [viewMode, setViewMode] = useState("monthly");
   const fiscalNum = master.company.fiscalNum || 1;
   const fiscalIdx = fiscalMonths.indexOf(selMonth);
@@ -761,11 +761,11 @@ function PLScreen({ selMonth, setSelMonth, val, totalSales, genka, grossProfit, 
   const rows = viewMode==="annual" ? annualRows : monthlyRows;
 
   return (
-    <div className="screen-wrap" style={s.screenWrap}>
+    <div className="screen-wrap b-screen">
+      <ScreenHead title="損益計算書" onBack={() => setScreen("settings")} />
       <div style={s.pageHeader}>
         <div>
-          <div style={s.pageTitle}>損益計算書</div>
-          <div style={{ fontSize:12, color:"#aaa", marginTop:2 }}>第{fiscalNum}期　{fiscalMonths[0]}〜{fiscalMonths[11]}</div>
+          <div style={{ fontSize:14, color:T.sub }}>第{fiscalNum}期　{fiscalMonths[0]}〜{fiscalMonths[11]}</div>
         </div>
         <div style={{ display:"flex", gap:10, alignItems:"center" }}>
           <div style={s.taxSwitch}>
@@ -800,39 +800,46 @@ function PLScreen({ selMonth, setSelMonth, val, totalSales, genka, grossProfit, 
 }
 
 // ── AR/AP ─────────────────────────────────────────────────────────────────────
-function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setModal }) {
+function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setModal, setScreen }) {
   const unpS=sales.filter(s=>s.status==="未入金"), paidS=sales.filter(s=>s.status==="入金済");
   const unpE=expenses.filter(e=>e.status==="未払い"), paidE=expenses.filter(e=>e.status==="支払済");
   const arT=unpS.reduce((s,r)=>s+r.amount,0), apT=unpE.reduce((s,r)=>s+r.amount,0);
   const mS=(id)=>{setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r));showToast("入金済みにしました");};
   const mE=(id)=>{setExpenses(p=>p.map(e=>e.id===id?{...e,status:"支払済"}:e));showToast("支払済みにしました");};
+  const Row = ({ r, sub, btn, onBtn, done, color, kind }) => (
+    <div className="todo">
+      <div className="c"><b>{r.client}</b><small>{sub}</small></div>
+      <div className="m"><N v={val(r.amount)} setModal={setModal} style={{ fontSize:16, fontWeight:700, color: done ? T.sub : color, borderBottom:"none" }} modal={{ title:`${r.client}　${kind}`, amount:val(r.amount), rows:[{ "相手先":r.client, "何月分":r.month, "内容":r.account || r.memo || "—" }] }} /></div>
+      {btn ? <button className="btn-sub sm" onClick={onBtn}>{btn}</button> : <span className="st ok">{done}</span>}
+    </div>
+  );
   return (
-    <div className="screen-wrap" style={s.screenWrap}>
-      <div style={s.pageHeader}><div style={s.pageTitle}>未入金・未払金</div></div>
-      <div className="master-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-        <div>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-            <div style={s.secTitle}>未入金（まだ入っていないお金）</div>
-            <N v={val(arT)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#854F0B" }} modal={{ title:"未入金の合計", amount:val(arT), color:"#854F0B", rows:unpS.map(r=>({ "相手先":r.client,"反映月":r.month,"金額":val(r.amount) })) }} />
+    <div className="screen-wrap b-screen">
+      <ScreenHead title="未入金・未払金" onBack={() => setScreen("settings")} />
+      <div className="master-grid" style={{ display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:16 }}>
+        <div style={{ minWidth:0 }}>
+          <h2 className="sec-h" style={{ marginTop:0, justifyContent:"space-between" }}><span>未入金<span className="inl">（まだ入っていないお金）</span></span><N v={val(arT)} setModal={setModal} style={{ color:"#8A5300" }} modal={{ title:"未入金の合計", amount:val(arT), rows:unpS.map(r=>({ "相手先":r.client,"何月分":r.month,"金額":val(r.amount) })) }} /></h2>
+          <div className="card list">
+            {unpS.length===0 && <div className="empty">未入金はありません</div>}
+            {unpS.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${typeLabel(r.type)}`} btn="入金された" onBtn={()=>mS(r.id)} color="#8A5300" kind="未入金" />)}
           </div>
-          <div className="tbl-wrap" style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額","区分",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
-            {unpS.length===0?<tr><td colSpan={4} style={{ ...s.td,textAlign:"center",color:"#bbb",padding:20 }}>✓ 未入金なし</td></tr>
-            :unpS.map(r=><tr key={r.id} style={s.tr}><td style={{ ...s.td,fontWeight:500 }}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700,color:"#854F0B" }} modal={{ title:`${r.client}　未入金`,amount:val(r.amount),color:"#854F0B",rows:[{ "相手先":r.client,"反映月":r.month,"区分":typeLabel(r.type),"備考":r.memo||"—" }],note:"「入金済」ボタンで消込できます。" }} /></td><td style={s.td}><span style={{ ...s.badge,...s.bAmber }}>{typeLabel(r.type)}</span></td><td style={s.td}><button style={s.paidBtn} onClick={()=>mS(r.id)}>入金済</button></td></tr>)}
-          </tbody></table></div>
-          <div style={s.secTitleSub}>入金済（消込済）</div>
-          <div className="tbl-wrap" style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidS.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td><td style={s.td}><span style={{ ...s.badge,...s.bGreen }}>✓ 入金済</span></td></tr>)}</tbody></table></div>
+          <h2 className="sec-h">入金済み</h2>
+          <div className="card list">
+            {paidS.length===0 && <div className="empty">まだありません</div>}
+            {paidS.map(r => <Row key={r.id} r={r} sub={`${r.month}分${r.memo ? `・${r.memo}` : ""}`} done="入金済" kind="入金済" />)}
+          </div>
         </div>
-        <div>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-            <div style={{ ...s.secTitle,color:"#A32D2D" }}>未払金（まだ払っていないお金）</div>
-            <N v={val(apT)} setModal={setModal} style={{ fontSize:16, fontWeight:800, color:"#A32D2D" }} modal={{ title:"未払金の合計", amount:val(apT), color:"#A32D2D", rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }} />
+        <div style={{ minWidth:0 }}>
+          <h2 className="sec-h" style={{ marginTop:0, justifyContent:"space-between" }}><span>未払金<span className="inl">（まだ払っていないお金）</span></span><N v={val(apT)} setModal={setModal} style={{ color:"#B42318" }} modal={{ title:"未払金の合計", amount:val(apT), rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }} /></h2>
+          <div className="card list">
+            {unpE.length===0 && <div className="empty">未払金はありません</div>}
+            {unpE.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${r.account}`} btn="払った" onBtn={()=>mE(r.id)} color="#B42318" kind="未払金" />)}
           </div>
-          <div className="tbl-wrap" style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額",""].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>
-            {unpE.length===0?<tr><td colSpan={4} style={{ ...s.td,textAlign:"center",color:"#bbb",padding:20 }}>✓ 未払いなし</td></tr>
-            :unpE.map(r=><tr key={r.id} style={s.tr}><td style={{ ...s.td,fontWeight:500 }}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700,color:"#A32D2D" }} modal={{ title:`${r.client}　未払い`,amount:val(r.amount),color:"#A32D2D",rows:[{ "相手先":r.client,"科目":r.account,"備考":r.memo||"—" }],note:"「支払済」ボタンで消込できます。" }} /></td><td style={s.td}><button style={{ ...s.paidBtn,borderColor:"#f09595",color:"#A32D2D" }} onClick={()=>mE(r.id)}>支払済</button></td></tr>)}
-          </tbody></table></div>
-          <div style={s.secTitleSub}>支払済（消込済）</div>
-          <div className="tbl-wrap" style={s.tblWrap}><table style={s.tbl}><thead><tr>{["相手先","科目","金額"].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead><tbody>{paidE.map(r=><tr key={r.id} style={{ ...s.tr,opacity:0.5 }}><td style={s.td}>{r.client}</td><td style={{ ...s.td,color:"#666" }}>{r.account}</td><td style={{ ...s.td,textAlign:"right" }}>{val(r.amount)}</td></tr>)}</tbody></table></div>
+          <h2 className="sec-h">支払済み</h2>
+          <div className="card list">
+            {paidE.length===0 && <div className="empty">まだありません</div>}
+            {paidE.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${r.account}`} done="支払済" kind="支払済" />)}
+          </div>
         </div>
       </div>
     </div>
@@ -1375,11 +1382,8 @@ function MasterScreen({ master, setMaster, showToast, setScreen }) {
   };
 
   return (
-    <div className="screen-wrap" style={s.screenWrap}>
-      <div style={s.pageHeader}>
-        <div style={s.pageTitle}>マスター設定</div>
-        <button style={s.btnP} onClick={saveMaster}>保存する</button>
-      </div>
+    <div className="screen-wrap b-screen">
+      <ScreenHead title="会社・口座・科目" onBack={() => setScreen("settings")} right={<button style={{ ...s.btnP, padding:"8px 14px" }} onClick={saveMaster}>保存する</button>} />
 
       <div style={{ display:"flex", gap:8, marginBottom:16 }}>
         {[["company","会社情報"],["accounts","勘定科目"]].map(([id,label]) => (
@@ -1977,7 +1981,8 @@ const css = `
     .inv-grid{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
     .item-grid{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
     .item-desc{ grid-column:1 / -1; }
-    .master-grid{ grid-template-columns:1fr !important; }
+    .master-grid{ grid-template-columns:minmax(0,1fr) !important; }
+    .master-grid > *{ min-width:0; }
     /* 入力欄が16px未満だと、iPhoneでは触るたびに画面が勝手に拡大する */
     input, select, textarea{ font-size:16px !important; min-height:44px; }
     .tbl-wrap{ overflow-x:auto !important; -webkit-overflow-scrolling:touch; }
