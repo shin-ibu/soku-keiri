@@ -527,7 +527,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, ar, ap, val, sa
 
   const mSales = { title:`${selMonth}分　売上合計`,   amount:val(totalSales), rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` };
   const mExp   = { title:`${selMonth}分　経費合計`,   amount:val(totalExp), formula:`売上原価 ${val(genka)}\n＋ 販管費 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) };
-  const mOp    = { title:`${selMonth}分　手元に残るお金（営業利益）`, amount:val(opProfit), formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"未入金・未払金も含めた見込みです。" };
+  const mOp    = { title:`${selMonth}分の利益（営業利益）`, amount:val(opProfit), formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"まだ入金されていない売上・まだ払っていない経費も含めた見込みです。口座にあるお金とは違います。" };
   const mAr    = { title:"未入金の合計", amount:val(ar), rows:unpS.map(r=>({ "相手先":r.client,"何月分":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` };
   const mAp    = { title:"未払金の合計", amount:val(ap), rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })), note:`${apCount}件が未払いです。` };
 
@@ -550,8 +550,8 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, ar, ap, val, sa
       </div>
       {fiscalLabel && <div className="muted fiscal">{fiscalLabel}</div>}
 
-      <button className="card hero" onClick={() => setScreen("cashflow")} aria-label={`${mo}、手元に残るお金。お金の流れを開く`}>
-        <span className="l">{mo}、手元に残るお金<small>（見込み）</small></span>
+      <button className="card hero" onClick={() => setScreen("cashflow")} aria-label={`${mo}の利益。お金の流れを開く`}>
+        <span className="l">{mo}の利益<small>（見込み）</small></span>
         <span className="v" onClick={e => { e.stopPropagation(); setModal(mOp); }}>{val(opProfit)}</span>
         <span className="go"><Ic n="chev" /></span>
       </button>
