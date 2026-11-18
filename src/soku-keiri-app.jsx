@@ -540,7 +540,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, ar, ap, val, sa
 
   const mSales = { title:`${selMonth}分　売上合計`,   amount:val(totalSales), rows:curSales.map(r=>({ "日付":r.date,"相手先":r.client,"金額":val(r.amount),"状態":r.status })), note:`${curSales.length}件の合計です。` };
   const mExp   = { title:`${selMonth}分　経費合計`,   amount:val(totalExp), formula:`売上原価 ${val(genka)}\n＋ 販管費 ${val(sga)}\n＝ 経費合計 ${val(totalExp)}`, rows:curExp.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) };
-  const mOp    = { title:`${selMonth}分の利益（営業利益）`, amount:val(opProfit), formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"まだ入金されていない売上・まだ払っていない経費も含めた見込みです。口座にあるお金とは違います。" };
+  const mOp    = { title:`${selMonth}分の利益（営業利益）`, amount:val(opProfit), formula:`売上高 ${val(totalSales)}\nー 売上原価 ${val(genka)}\n＝ 粗利 ${val(grossProfit)}\nー 販管費 ${val(sga)}\n＝ 営業利益 ${val(opProfit)}`, note:"未入金の売上・未払いの経費も含めた見込みです。口座にあるお金とは違います。" };
   const mAr    = { title:"未入金の合計", amount:val(ar), rows:unpS.map(r=>({ "相手先":r.client,"何月分":r.month,"金額":val(r.amount) })), note:`${arCount}件が未入金です。` };
   const mAp    = { title:"未払金の合計", amount:val(ap), rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })), note:`${apCount}件が未払いです。` };
 
@@ -585,7 +585,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, ar, ap, val, sa
             <div key={r.id} className="todo">
               <div className="c"><b>{r.client}</b><span className="amt">{val(r.amount)}</span><small>{r.month}分{r.memo ? `・${r.memo}` : ""}</small></div>
               <div className="m">{due ? (due < td ? <span className="tag err">期限超過</span> : null) : null}{due && <small>期限：{mdJp(due)}</small>}</div>
-              <button className="btn-pri sm" onClick={() => markIn(r.id)}>入金された</button>
+              <button className="btn-pri sm" onClick={() => markIn(r.id)}>入金済にする</button>
             </div>
           ))}
           {inList.length > 3 && <button className="more" onClick={() => setScreen("ar")}>ほか{inList.length-3}件を見る</button>}
@@ -598,7 +598,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, ar, ap, val, sa
             <div key={r.id} className="todo">
               <div className="c"><b>{r.client}</b><span className="amt">{val(r.amount)}</span><small>{r.month}分・{r.account}</small></div>
               <div className="m" />
-              <button className="btn-sub sm" onClick={() => markOut(r.id)}>払った</button>
+              <button className="btn-sub sm" onClick={() => markOut(r.id)}>支払済にする</button>
             </div>
           ))}
           {unpE.length > 3 && <button className="more" onClick={() => setScreen("ar")}>ほか{unpE.length-3}件を見る</button>}
@@ -631,7 +631,7 @@ function HomeScreen({ setScreen, totalSales, totalExp, opProfit, ar, ap, val, sa
 
 
 // 画面に出す言葉（中のデータは「売掛」「買掛」のまま。こわさないため）
-const TYPE_LABEL = { "売掛":"あとで入金", "買掛":"あとで払う" };
+const TYPE_LABEL = { "売掛":"売掛（後日入金）", "買掛":"買掛（後日支払）" };
 const typeLabel = (t) => TYPE_LABEL[t] || t;
 
 // ── 相手先をえらぶ入力欄（打つと絞りこみ・なければその場で足せる） ─────────────
@@ -831,10 +831,10 @@ function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setM
       <ScreenHead title="未入金・未払金" onBack={() => setScreen("settings")} />
       <div className="master-grid" style={{ display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:16 }}>
         <div style={{ minWidth:0 }}>
-          <h2 className="sec-h" style={{ marginTop:0, justifyContent:"space-between" }}><span>未入金<span className="inl">（まだ入っていないお金）</span></span><N v={val(arT)} setModal={setModal} style={{ color:"#8A5300" }} modal={{ title:"未入金の合計", amount:val(arT), rows:unpS.map(r=>({ "相手先":r.client,"何月分":r.month,"金額":val(r.amount) })) }} /></h2>
+          <h2 className="sec-h" style={{ marginTop:0, justifyContent:"space-between" }}><span>未入金<span className="inl">（入金前の売上）</span></span><N v={val(arT)} setModal={setModal} style={{ color:"#8A5300" }} modal={{ title:"未入金の合計", amount:val(arT), rows:unpS.map(r=>({ "相手先":r.client,"何月分":r.month,"金額":val(r.amount) })) }} /></h2>
           <div className="card list">
             {unpS.length===0 && <div className="empty">未入金はありません</div>}
-            {unpS.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${typeLabel(r.type)}`} btn="入金された" onBtn={()=>mS(r.id)} color="#8A5300" kind="未入金" />)}
+            {unpS.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${typeLabel(r.type)}`} btn="入金済にする" onBtn={()=>mS(r.id)} color="#8A5300" kind="未入金" />)}
           </div>
           <h2 className="sec-h">入金済み</h2>
           <div className="card list">
@@ -843,10 +843,10 @@ function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setM
           </div>
         </div>
         <div style={{ minWidth:0 }}>
-          <h2 className="sec-h" style={{ marginTop:0, justifyContent:"space-between" }}><span>未払金<span className="inl">（まだ払っていないお金）</span></span><N v={val(apT)} setModal={setModal} style={{ color:"#B42318" }} modal={{ title:"未払金の合計", amount:val(apT), rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }} /></h2>
+          <h2 className="sec-h" style={{ marginTop:0, justifyContent:"space-between" }}><span>未払金<span className="inl">（支払前の経費）</span></span><N v={val(apT)} setModal={setModal} style={{ color:"#B42318" }} modal={{ title:"未払金の合計", amount:val(apT), rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }} /></h2>
           <div className="card list">
             {unpE.length===0 && <div className="empty">未払金はありません</div>}
-            {unpE.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${r.account}`} btn="払った" onBtn={()=>mE(r.id)} color="#B42318" kind="未払金" />)}
+            {unpE.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${r.account}`} btn="支払済にする" onBtn={()=>mE(r.id)} color="#B42318" kind="未払金" />)}
           </div>
           <h2 className="sec-h">支払済み</h2>
           <div className="card list">
@@ -1569,7 +1569,7 @@ function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMo
       </div>
       <FR label="売上の内容"><input style={s.inp} value={form.memo} onChange={e=>sf("memo",e.target.value)} placeholder="Webサイト制作など" /></FR>
       <div className="two">
-        <FR label="入金のしかた" hint={"現金：その場で受け取った → 入金済みで入ります\nあとで入金・カード：まだ受け取っていない → 未入金で入ります"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","売掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
+        <FR label="入金のしかた" hint={"現金：その場で入金 → 入金済で登録します\n売掛（後日入金）・カード：入金前 → 未入金で登録します"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","売掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
         <FR label="消費税"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>税率 10%（標準）</option><option value={8}>税率 8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
       </div>
       {showAlert && <div style={s.alertBox} role="alert">この月のほかの金額と大きく違います。金額が合っていれば、もう一度「この内容で保存」を押してください。</div>}
@@ -1605,7 +1605,7 @@ function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fisc
   return (
     <div className="bform">
       <AmountField value={form.amount} onChange={v=>sf("amount",v)} />
-      <FR label="支払先（だれに払ったか）"><CpPicker value={form.client} onChange={v=>sf("client",v)} counterparties={master.counterparties} addCounterparty={addCounterparty} kind="支払い先" placeholder="〇〇ビルなど（一部でもOK）" /></FR>
+      <FR label="支払先"><CpPicker value={form.client} onChange={v=>sf("client",v)} counterparties={master.counterparties} addCounterparty={addCounterparty} kind="支払い先" placeholder="〇〇ビルなど（一部でもOK）" /></FR>
       <div className="two">
         <FR label="取引日"><input type="date" style={s.inp} value={form.date} onChange={e=>{ const v=e.target.value; setForm(f=>({ ...f, date:v, month: fiscalMonths.includes(monthOfDate(v)) ? monthOfDate(v) : f.month })); }} /></FR>
         <FR label="何月分の経費か" hint={"この経費は何月分ですか？\n例）4月の家賃を5月に払う場合 → 4月と入力"}>
@@ -1623,7 +1623,7 @@ function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fisc
         </div>
       </FR>
       <div className="two">
-        <FR label="支払いのしかた" hint={"現金：その場で払った → 支払済みで入ります\nあとで払う・カード：まだ払っていない → 未払金で入ります"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
+        <FR label="支払いのしかた" hint={"現金：その場で支払 → 支払済で登録します\n買掛（後日支払）・カード：支払前 → 未払金で登録します"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
         <FR label="消費税"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>税率 10%（標準）</option><option value={8}>税率 8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
       </div>
       {showAlert && <div style={s.alertBox} role="alert">この月のほかの金額と大きく違います。金額が合っていれば、もう一度「この内容で保存」を押してください。</div>}
@@ -1702,7 +1702,7 @@ function RecordsScreen(p) {
                   <div className="rec-act">
                     <span className="muted">{typeLabel(r.type)}・税率{r.tax}%・{r.month}分</span>
                     <div>
-                      {unpaid && <button className="btn-sub" onClick={() => paid(r)}>{tab==="sales" ? "入金された" : "払った"}</button>}
+                      {unpaid && <button className="btn-sub" onClick={() => paid(r)}>{tab==="sales" ? "入金済にする" : "支払済にする"}</button>}
                       <button className="btn-del" onClick={() => del(r)}>消す</button>
                     </div>
                   </div>
