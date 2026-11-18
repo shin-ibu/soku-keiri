@@ -40,7 +40,7 @@ function useStatus({ sales, opProfit, selMonth, invoices }) {
 }
 
 // AIBOUから今日伝えること（データから毎回作る）
-function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths = [] }) {
+function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths = [], assets = [], notes = [], master, inventory = {} }) {
   const out = [];
   const dueOf = (r) => { const inv = r.invoiceId && invoices.find((v) => v.id === r.invoiceId); return inv && inv.dueDate ? inv.dueDate : ""; };
   out.push({ id: "b-report", who: "aibou", tag: "報告", text: `${selMonth}の売上は${man(totalSales)}、経費は${man(totalExp)}です。` });
@@ -62,6 +62,28 @@ function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMon
   const unset = [...sales, ...expenses].filter((r) => fiscalMonths.includes(r.month) && (r.project === undefined || r.project === null));
   if (unset.length) out.push({ id: "b-unset", who: "aibou", tag: "相談", waiting: true, text: `案件が未設定の記録が${unset.length}件あります（合計${yen(unset.reduce((s, x) => s + x.amount, 0))}）。どの案件のものか決めると、案件ごとの粗利が正しく出せます。`, actions: [{ label: "設定する", act: "go", to: "projects", primary: true }] });
 
+  // 10万円以上の経費：長く使うものか確かめる
+  expenses.filter((e) => fiscalMonths.includes(e.month) && e.amount >= 100000 && !e.asset && e.assetChecked === undefined && e.account !== "売上原価" && !e.demo).slice(0, 2).forEach((e) => {
+    out.push({ id: `b-asset-${e.id}`, who: "aibou", tag: "相談", waiting: true, text: `${e.client}への${yen(e.amount)}${e.memo ? `（${e.memo}）` : ""}は、長く使うもの（車・パソコン・設備・建物など）ですか？\n長く使うものなら、費用は使う年数に分けて入れます。`, actions: [{ label: "はい、登録する", act: "asset", id: e.id, primary: true }, { label: "いいえ", act: "notAsset", id: e.id }] });
+  });
+  // 税理士に確認すること
+  const zCount = assets.filter((a) => a.treatment === "pending").length + notes.filter((n) => !n.answered).length;
+  if (zCount) out.push({ id: "b-zeirishi", who: "aibou", tag: "連絡", text: `税理士に確認することが${zCount}件あります。次の打ち合わせで見てもらいましょう。`, actions: [{ label: "一覧を見る", act: "go", to: "zeirishi" }] });
+  // 毎月の確認：青色申告・従業員数
+  const co = (master && master.company) || {};
+  const thisM = (() => { const d = new Date(); return `${d.getFullYear()}年${d.getMonth() + 1}月`; })();
+  if (co.lastProfileCheck !== thisM) {
+    if (co.aoiro === undefined || co.employees === undefined || co.employees === "")
+      out.push({ id: "b-profile", who: "aibou", tag: "相談", waiting: true, text: "初めに教えてください。青色申告をしていますか？　従業員は何人ですか？\n長く使うものを、その年に全額経費にできる特例が使えるかの判断に使います。", actions: [{ label: "答える", act: "go", to: "zeirishi", primary: true }] });
+    else
+      out.push({ id: "b-profile", who: "aibou", tag: "相談", waiting: true, text: `今月の確認です。青色申告（${co.aoiro ? "している" : "していない"}）・従業員数（${co.employees}人）に変わりはありませんか？`, actions: [{ label: "変わりなし", act: "profileOk", primary: true }, { label: "変わった", act: "go", to: "zeirishi" }] });
+  }
+  // 在庫：仕入れがある会社には、先月末の在庫を聞く
+  if (expenses.some((e) => e.account === "売上原価")) {
+    const d = new Date(); const pm = new Date(d.getFullYear(), d.getMonth() - 1, 1); const prev = `${pm.getFullYear()}年${pm.getMonth() + 1}月`;
+    if (inventory[prev] === undefined) out.push({ id: "b-stock", who: "aibou", tag: "相談", waiting: true, text: `${prev}末の在庫は、いくら分ありましたか？\n売れ残りを費用から外して、利益を正しく出すのに使います。在庫がなければ 0 と入れてください。`, actions: [{ label: "入力する", act: "go", to: "assets", sub: "stock", primary: true }] });
+  }
+
   if (hasDemo) out.push({ id: "b-demo", who: "aibou", tag: "相談", waiting: true, text: "今は見本の数字が入っています。見本を消して、自分の数字で始めますか？", actions: [{ label: "消して始める", act: "clearDemo", primary: true }, { label: "このまま見る", act: "say", text: "このまま見る" }] });
   return out;
 }
@@ -69,6 +91,8 @@ function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMon
 // 社長の言葉への返事（AIにつながるまでの決まった返事）。どんな言葉にも必ず返す。
 function replyTo(text, ctx) {
   const t = text.replace(/\s/g, "");
+  if (/税理士/.test(t) && /聞きたい|確認したい|質問/.test(t)) return { text: "税理士に確認することの一覧に入れました。次の打ち合わせで聞きましょう。", act: "addNote" };
+  if (/税理士/.test(t)) return { text: "税理士に確認することの一覧を開きます。", go: "zeirishi" };
   if (/見本.*(消|始)|消して始める/.test(t)) return { text: "見本を消しました。これからは自分の数字で見られます。", act: "clearDemo" };
   if (/このまま見る/.test(t)) return { text: "わかりました。見本はいつでも「設定」から消せます。" };
   if (/請求書/.test(t)) return { text: "請求書の画面を開きます。", go: "invoice" };
@@ -78,6 +102,7 @@ function replyTo(text, ctx) {
   if (/利益|収支|もうか|儲/.test(t)) return { text: `${ctx.selMonth}の利益は${man(ctx.opProfit)}の見込みです。損益計算書を開きます。`, go: "pl" };
   if (/資金|残高|お金の流れ/.test(t)) return { text: "お金の流れの画面を開きます。", go: "cashflow" };
   if (/取引先|相手先/.test(t)) return { text: "取引先の一覧を開きます。", go: "partners" };
+  if (/減価償却|固定資産|設備|借入|在庫|資産/.test(t)) return { text: "資産・借入・在庫の画面を開きます。", go: "assets" };
   if (/案件/.test(t)) return { text: "案件の画面を開きます。案件ごとの粗利と、未設定の記録が見られます。", go: "projects" };
   if (/損益|PL|ＰＬ|成績/.test(t)) return { text: "損益計算書を開きます。行の「?」で、それぞれの利益の意味が見られます。", go: "pl" };
   if (/貸借|BS|ＢＳ|財産/.test(t)) return { text: "貸借対照表を開きます。", go: "bs" };
@@ -142,14 +167,14 @@ function Bubble({ m, onAction }) {
 }
 
 export default function TalkScreen(p) {
-  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab, projects = [], fiscalMonths = [] } = p;
+  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab, projects = [], fiscalMonths = [], assets = [], notes = [], setNotes, inventory = {}, setExpenses, setMaster, openAssetFromExpense, setAssetsTab } = p;
   const [log, setLog] = useState(loadTalk);
   const [draft, setDraft] = useState("");
   const [listening, setListening] = useState(false);
   const endRef = useRef(null);
   const recRef = useRef(null);
   const status = useStatus({ sales, opProfit, selMonth, invoices });
-  const briefing = useMemo(() => buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths }), [sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths]);
+  const briefing = useMemo(() => buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory }), [sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory]);
   const owner = master?.company?.name ? `${master.company.name}の相棒` : "社長の相棒";
 
   useEffect(() => { saveTalk(log); }, [log]);
@@ -159,6 +184,7 @@ export default function TalkScreen(p) {
 
   const run = (r) => {
     if (r.act === "clearDemo") clearDemo();
+    if (r.act === "addNote" && setNotes) setNotes((ns) => [...ns, { id: Date.now(), text: r.note, answered: false, answer: "" }]);
     if (r.tab && setArTab) setArTab(r.tab);
     if (r.go) setTimeout(() => setScreen(r.go), 600);
     if (r.entry) setTimeout(() => onEntry(r.entry), 600);
@@ -168,13 +194,17 @@ export default function TalkScreen(p) {
     const t = String(text || "").trim();
     if (!t) return;
     const r = replyTo(t, { ar, arCount: sales.filter((s) => s.status === "未入金").length, opProfit, selMonth });
+    if (r.act === "addNote") r.note = t;
     push({ who: "me", text: t }, { who: "aibou", text: r.text });
     setDraft("");
     run(r);
   };
 
   const onAction = (a, m) => {
-    if (a.act === "go") { if (a.tab && setArTab) setArTab(a.tab); push({ who: "me", text: a.label }, { who: "aibou", text: "画面を開きます。" }); setTimeout(() => setScreen(a.to), 400); return; }
+    if (a.act === "asset") { const e = expenses.find((x) => x.id === a.id); push({ who: "me", text: a.label }, { who: "aibou", text: "長く使うものとして登録する画面を開きます。種類と使い始めた月を確かめてください。" }); if (e && openAssetFromExpense) setTimeout(() => openAssetFromExpense(e), 400); return; }
+    if (a.act === "notAsset") { setExpenses((es) => es.map((x) => (x.id === a.id ? { ...x, assetChecked: false } : x))); push({ who: "me", text: a.label }, { who: "aibou", text: "わかりました。ふつうの経費のまま、その月の費用に入れます。" }); return; }
+    if (a.act === "profileOk") { setMaster((m) => ({ ...m, company: { ...m.company, lastProfileCheck: `${new Date().getFullYear()}年${new Date().getMonth() + 1}月` } })); push({ who: "me", text: a.label }, { who: "aibou", text: "ありがとうございます。来月また確認します。" }); return; }
+    if (a.act === "go") { if (a.tab && setArTab) setArTab(a.tab); if (a.sub && setAssetsTab) setAssetsTab(a.sub); push({ who: "me", text: a.label }, { who: "aibou", text: "画面を開きます。" }); setTimeout(() => setScreen(a.to), 400); return; }
     if (a.act === "markPaid") {
       const row = sales.find((s) => s.id === a.id);
       setSales((prev) => prev.map((s) => (s.id === a.id ? { ...s, status: "入金済" } : s)));

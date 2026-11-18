@@ -177,3 +177,124 @@ describe("貸借対照表（BS）", () => {
     expect(openingCashOf({ company: { openingCash: 1500000 } })).toBe(1500000);
   });
 });
+
+// ── 固定資産・借入金・在庫 ─────────────────────────────────────────────────
+import { depreciationYears, depreciationForMonth, bookValueAt, slRate, treatmentOptions, loanBalanceAt, loanPaymentFor, inventoryAdjust, defaultMethod } from "../aibou/assets.js";
+const corp = { type: "法人", aoiro: true, employees: 3 };
+
+describe("減価償却（国税庁の計算例と一致するか）", () => {
+  const base = { cost: 1000000, acquired: "2026-04-01", start: "2026-04", kind: "other", life: 10, treatment: "normal" };
+  it("定額法の償却率（1÷年数を小数第3位で切り上げ）", () => {
+    expect(slRate(6)).toBe(0.167); expect(slRate(3)).toBe(0.334); expect(slRate(9)).toBe(0.112); expect(slRate(24)).toBe(0.042);
+  });
+  it("定額法：100万円・10年は毎年10万円、最後は99,999円で1円残す", () => {
+    const y = depreciationYears({ ...base, method: "sl" }, 4, corp);
+    expect(y).toHaveLength(10);
+    expect(y.slice(0, 9).every((r) => r.amount === 100000)).toBe(true);
+    expect(y[9].amount).toBe(99999); expect(y[9].bookEnd).toBe(1);
+  });
+  it("200%定率法：100万円・10年は1年目20万円、7〜9年目65,536円、最後65,535円", () => {
+    const y = depreciationYears({ ...base, method: "db" }, 4, corp).map((r) => r.amount);
+    expect(y).toEqual([200000, 160000, 128000, 102400, 81920, 65536, 65536, 65536, 65536, 65535]);
+  });
+  it("300万円の普通自動車（定額法・6年）は毎年501,000円、最後494,999円", () => {
+    const y = depreciationYears({ cost: 3000000, start: "2026-04", kind: "car", treatment: "normal", method: "sl" }, 4, corp).map((r) => r.amount);
+    expect(y).toEqual([501000, 501000, 501000, 501000, 501000, 494999]);
+  });
+  it("期の途中で使い始めたら月割（10月から3月までの6か月）", () => {
+    const y = depreciationYears({ ...base, start: "2026-10", method: "sl" }, 4, corp);
+    expect(y[0].months).toBe(6); expect(y[0].amount).toBe(50000);
+  });
+  it("毎月の減価償却費を足すと、その期の額になる", () => {
+    const a = { ...base, start: "2026-10", method: "db" };
+    const months = ["2026年10月", "2026年11月", "2026年12月", "2027年1月", "2027年2月", "2027年3月"];
+    const total = months.reduce((t, m) => t + depreciationForMonth(a, m, 4, corp), 0);
+    expect(total).toBe(depreciationYears(a, 4, corp)[0].amount);
+    expect(depreciationForMonth(a, "2026年9月", 4, corp)).toBe(0);
+  });
+  it("一括償却資産は3年で均等（月割しない）", () => {
+    const y = depreciationYears({ cost: 150000, start: "2026-12", kind: "pc", treatment: "lump3" }, 4, corp).map((r) => r.amount);
+    expect(y).toEqual([50000, 50000, 50000]);
+  });
+  it("少額の特例は使い始めた月に全額", () => {
+    const a = { cost: 350000, start: "2026-11", acquired: "2026-11-05", kind: "pc", treatment: "small" };
+    expect(depreciationForMonth(a, "2026年11月", 4, corp)).toBe(350000);
+    expect(depreciationForMonth(a, "2026年12月", 4, corp)).toBe(0);
+  });
+  it("土地は償却せず、ずっと買った金額", () => {
+    const land = { cost: 20000000, acquired: "2026-05-01", start: "2026-05", kind: "land", treatment: "normal" };
+    expect(depreciationYears(land, 4, corp)).toEqual([]);
+    expect(bookValueAt(land, "2030年1月", 4, corp)).toBe(20000000);
+  });
+  it("帳簿価額 ＝ 取得価額 − ここまでの減価償却費", () => {
+    const a = { ...base, method: "sl" };
+    expect(bookValueAt(a, "2027年3月", 4, corp)).toBe(900000);
+    expect(bookValueAt(a, "2026年3月", 4, corp)).toBe(0); // 買う前
+  });
+  it("判断待ちは通常の減価償却で見込みを出す", () => {
+    const y = depreciationYears({ ...base, method: "sl", treatment: "pending" }, 4, corp);
+    expect(y[0].amount).toBe(100000);
+  });
+  it("償却方法の初期値：法人の車は定率法、建物とソフトは定額法、個人は定額法", () => {
+    expect(defaultMethod({ kind: "car" }, corp)).toBe("db");
+    expect(defaultMethod({ kind: "bldg_wood_office" }, corp)).toBe("sl");
+    expect(defaultMethod({ kind: "software" }, corp)).toBe("sl");
+    expect(defaultMethod({ kind: "car" }, { type: "個人事業主" })).toBe("sl");
+  });
+  it("ソフトウェアは0円まで償却", () => {
+    const y = depreciationYears({ cost: 500000, start: "2026-04", kind: "software", treatment: "normal" }, 4, corp);
+    expect(y[y.length - 1].bookEnd).toBe(0);
+  });
+  it("金額からの扱いの候補（2026年4月以後は40万円未満まで特例）", () => {
+    expect(treatmentOptions(150000, corp, "2026-11-01").opts).toEqual(["lump3", "small", "normal"]);
+    expect(treatmentOptions(350000, corp, "2026-11-01").opts).toEqual(["small", "normal"]);
+    expect(treatmentOptions(350000, corp, "2026-03-01").opts).toEqual(["normal"]);
+    expect(treatmentOptions(350000, { ...corp, aoiro: false }, "2026-11-01").opts).toEqual(["normal"]);
+  });
+});
+
+describe("借入金", () => {
+  const loan = { amount: 1200000, date: "2026-04-10", start: "2026-05", monthly: 100000, rate: 2.4 };
+  it("残高は借りた額 − 返した元金", () => {
+    expect(loanBalanceAt(loan, "2026年4月")).toBe(1200000);
+    expect(loanBalanceAt(loan, "2026年5月")).toBe(1100000);
+    expect(loanBalanceAt(loan, "2027年4月")).toBe(0);
+  });
+  it("利息は月初の残高×年利÷12", () => {
+    expect(loanPaymentFor(loan, "2026年5月")).toEqual({ principal: 100000, interest: 2400 });
+    expect(loanPaymentFor(loan, "2026年6月").interest).toBe(2200);
+  });
+});
+
+describe("在庫で売上原価を直す", () => {
+  it("期首の在庫 ＋ 仕入れ − 期末の在庫", () => {
+    expect(inventoryAdjust({ "2026年10月": 200000, "2026年11月": 300000 }, ["2026年11月"])).toEqual({ opening: 200000, closing: 300000 });
+  });
+  it("期末の在庫が入っていなければ直さない", () => {
+    expect(inventoryAdjust({ "2026年10月": 200000 }, ["2026年11月"])).toBe(null);
+  });
+});
+
+describe("PL・BSに固定資産・借入金・在庫を反映", () => {
+  const ext = {
+    startMonth: 4, profile: corp,
+    assets: [{ id: 9, name: "社用車", cost: 3000000, acquired: "2026-11-01", start: "2026-11", kind: "car", treatment: "normal", method: "sl" }],
+    loans: [{ amount: 1200000, date: "2026-11-01", start: "2026-12", monthly: 100000, rate: 2.4 }],
+    inventory: { "2026年10月": 0, "2026年11月": 50000 },
+  };
+  const buy = { id: 99, month: "2026年11月", client: "車屋", account: "その他経費", amount: 3000000, status: "支払済", asset: 9 };
+  const pl = plNumbers({ sales, expenses: [...expenses, buy], accounts, months: M, taxRate: 25, ext });
+  it("車の購入は費用にせず、その月の減価償却費だけを入れる", () => {
+    expect(pl.depTotal).toBe(depreciationForMonth(ext.assets[0], "2026年11月", 4, corp));
+    expect(pl.sgaByAcc.find((x) => x.label === "その他")).toBeUndefined();
+  });
+  it("在庫の分だけ売上原価が減る", () => { expect(pl.cogs).toBe(120000 - 50000); });
+  const bs = bsNumbers({ sales, expenses: [...expenses, buy], months: M, openingCash: 5000000, capital: 0, now: "2026年11月", ext });
+  it("BSに固定資産・在庫・借入金が載り、左右が一致する", () => {
+    expect(bs.fixed).toBe(3000000 - pl.depTotal);
+    expect(bs.stock).toBe(50000);
+    expect(bs.loanBal).toBe(1200000);
+    expect(bs.cash).toBe(5000000 + 150000 - 203000 - 3000000 + 1200000);
+    expect(bs.assets).toBe(bs.liab + bs.equity);
+  });
+});

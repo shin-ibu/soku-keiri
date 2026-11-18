@@ -1,13 +1,17 @@
+import { ymOf, loanPaymentFor } from "../aibou/assets.js";
 import { openingCashOf } from "../aibou/keieiLogic.js";
 import { monthShort } from "../lib/format.js";
 import { N, Ic, MonthPill, ScreenHead } from "../ui/parts.jsx";
 import { T } from "../ui/theme.js";
 
-export function CashflowScreen({ val, sales, expenses, setModal, fiscalMonths, setScreen, ar, ap, selMonth, setSelMonth, master }) {
+export function CashflowScreen({ val, sales, expenses, setModal, fiscalMonths, setScreen, ar, ap, selMonth, setSelMonth, master, loans = [] }) {
   const ms = fiscalMonths;
   const opening = openingCashOf(master); const open0 = opening ?? 1000000;
-  const dIn  = ms.map(m=>sales.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
-  const dOut = ms.map(m=>expenses.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
+  // 借入金：借りた月に入り、返済（元金＋利息）は毎月出ていく
+  const loanIn  = ms.map(m=>loans.filter(l=>{ const d=ymOf(l.date); return d && `${d.y}年${d.m}月`===m; }).reduce((s,l)=>s+Number(l.amount||0),0));
+  const loanOut = ms.map(m=>loans.reduce((s,l)=>{ const p=loanPaymentFor(l,m); return s+p.principal+p.interest; },0));
+  const dIn  = ms.map((m,i)=>sales.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0)+loanIn[i]);
+  const dOut = ms.map((m,i)=>expenses.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0)+loanOut[i]);
   const bal  = dIn.map((v,i)=>{ let b=open0; for(let j=0;j<=i;j++) b+=dIn[j]-dOut[j]; return b; });
   const mkIn =(i)=>({ title:`${ms[i]}分　入金合計`,amount:val(dIn[i]),rows:sales.filter(r=>r.month===ms[i]).map(r=>({ "相手先":r.client,"金額":val(r.amount) })) });
   const mkOut=(i)=>({ title:`${ms[i]}分　支払合計`,amount:val(dOut[i]),rows:expenses.filter(r=>r.month===ms[i]).map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) });

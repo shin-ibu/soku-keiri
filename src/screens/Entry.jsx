@@ -50,7 +50,8 @@ export function SaleForm({ setSales, setSelMonth, showToast, curSales, master, f
 }
 
 // ── 入力：経費（もとは経費入力の画面の中にあった。処理はそのまま） ─────────────
-export function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fiscalMonths, addCounterparty, onDone, sales=[], expenses=[], projects=[], setProjects=()=>{} }) {
+export function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fiscalMonths, addCounterparty, onDone, sales=[], expenses=[], projects=[], setProjects=()=>{}, openAssetFromExpense }) {
+  const [longUse, setLongUse] = useState(false);   // 長く使うもの（10万円以上）
   const [form, setForm] = useState({ date:today(), month:monthOfDate(today()), type:"現金", client:"", account:"", amount:"", tax:10, memo:"", status:"未払い" });
   const [freeText, setFreeText] = useState("");
   const [suggestion, setSuggestion] = useState(null);
@@ -68,11 +69,13 @@ export function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, maste
     if (force!==true && !showAlert && isOutlier()) { setShowAlert(true); return; }
     setShowAlert(false);
     const project = form.project !== undefined ? form.project : (pSug ? pSug.value : null);
-    setExpenses(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "支払済" : "未払い", project }]); setSelMonth(form.month);
+    const rec = { ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "支払済" : "未払い", project, assetChecked: Number(form.amount) >= 100000 ? longUse : undefined };
+    setExpenses(p=>[...p,rec]); setSelMonth(form.month);
     setFreeText(""); setSuggestion(null);
     setForm({ date:today(),month:monthOfDate(today()),type:"現金",client:"",account:"",amount:"",tax:10,memo:"",status:"未払い" });
     showToast((form.type==="現金" ? "経費を保存しました（支払済み）" : "経費を保存しました（未払金）") + (project===null ? "。案件は未設定です" : ""));
     if (onDone) onDone();
+    if (longUse && openAssetFromExpense) { openAssetFromExpense({ ...rec, memo: freeText || rec.memo }); setLongUse(false); }
   };
   const accountOptions = master.accounts.filter(a=>a.category!=="revenue");
   return (
@@ -100,6 +103,12 @@ export function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, maste
         <FR label="支払いのしかた" hint={"現金：その場で支払 → 支払済で登録します\n買掛（後日支払）・カード：支払前 → 未払金で登録します"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
         <FR label="消費税"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>税率 10%（標準）</option><option value={8}>税率 8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
       </div>
+      {Number(form.amount) >= 100000 && (
+        <label style={{ display:"flex", gap:10, alignItems:"flex-start", background:"#F7F8FA", border:"1px solid #DFE3E8", borderRadius:12, padding:"12px 14px", fontSize:15, lineHeight:1.6, cursor:"pointer" }}>
+          <input type="checkbox" checked={longUse} onChange={e=>setLongUse(e.target.checked)} style={{ width:22, height:22, minHeight:22, marginTop:2 }} />
+          <span><b>長く使うもの</b>（車・パソコン・設備・建物など）<br /><span style={{ color:"#5B6573", fontSize:13 }}>チェックすると、保存のあとに「長く使うもの」として登録します。費用は使う年数に分けて入ります。</span></span>
+        </label>
+      )}
       {showAlert && <div style={s.alertBox} role="alert">この月のほかの金額と大きく違います。金額が合っていれば、もう一度「この内容で保存」を押してください。</div>}
       <button className="btn-main" onClick={()=>doSave(showAlert)}>この内容で保存</button>
     </div>

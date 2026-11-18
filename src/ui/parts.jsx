@@ -86,6 +86,8 @@ export function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, sho
     { id:"projects", icon:"▦", label:"案件" },
     { id:"pl",       icon:"≡", label:"損益計算書（PL）" },
     { id:"bs",       icon:"⊟", label:"貸借対照表（BS）" },
+    { id:"assets",   icon:"▤", label:"資産・借入・在庫" },
+    { id:"zeirishi", icon:"✓", label:"税理士に確認すること" },
     { id:"ar",       icon:"◎", label:"未入金・未払金" },
     { id:"cashflow", icon:"⇄", label:"資金繰り" },
     { id:"partners", icon:"☺", label:"取引先" },
@@ -151,7 +153,7 @@ export function BottomNav({ screen, setScreen, onPlus }) {
   const on = (ids) => ids.includes(screen);
   const items = [
     ["talk","chat","AIBOU",["talk","home"]], ["records","list","記録",["records","sales","expenses"]], null,
-    ["cashflow","chart","お金の流れ",["cashflow"]], ["settings","gear","設定",["settings","partners","pl","bs","projects","ar","master","invoice","invoice-new"]],
+    ["cashflow","chart","お金の流れ",["cashflow"]], ["settings","gear","設定",["settings","partners","pl","bs","projects","assets","zeirishi","ar","master","invoice","invoice-new"]],
   ];
   return (
     <nav className="bottom-nav" aria-label="メニュー">

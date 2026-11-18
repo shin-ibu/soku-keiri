@@ -2,6 +2,7 @@
 // 数字の名前と式は機能一覧14章「案件と利益の定義」に合わせる。粗利と利益を混ぜない。
 import { useState } from "react";
 import { color } from "../ui/tokens.js";
+import { Head, Tab, Why, Num } from "./ui.jsx";
 import { PROJECT_STATUSES, ACTIVE, COMMON, sum, useProjectNumbers, openingCashOf, plNumbers, bsNumbers } from "./keieiLogic.js";
 
 const pct = (a, b) => (b ? `${Math.round((a / b) * 1000) / 10}%` : "—");
@@ -44,27 +45,6 @@ export function ProjectField({ kind, value, suggestion, onChange, projects, setP
     </div>
   );
 }
-
-const Back = ({ onClick }) => (
-  <button className="icon-btn" aria-label="もどる" onClick={onClick}>
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-  </button>
-);
-const Head = ({ title, onBack, right }) => (<div className="scr-head">{onBack ? <Back onClick={onBack} /> : <span />}<h1>{title}</h1>{right || <span />}</div>);
-const Tab = ({ items, value, onChange }) => (
-  <div className="seg" role="tablist">{items.map(([id, label]) => <button key={id} role="tab" aria-selected={value === id} className={value === id ? "on" : ""} onClick={() => onChange(id)}>{label}</button>)}</div>
-);
-// 「これは何？」の説明
-function Why({ label, children }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button type="button" aria-label={`${label}とは`} aria-expanded={open} onClick={() => setOpen((v) => !v)} style={{ width: 22, height: 22, borderRadius: 11, border: "none", background: K.priSoft, color: K.pri, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: 0, flexShrink: 0 }}>?</button>
-      {open && <div style={{ gridColumn: "1 / -1", fontSize: 14, lineHeight: 1.7, color: "#1E3A6E", background: K.priSoft, borderRadius: 8, padding: "8px 12px", whiteSpace: "pre-line" }}>{children}</div>}
-    </>
-  );
-}
-const Num = ({ v, onClick, style }) => <button type="button" onClick={onClick} className="num" style={{ border: "none", background: "none", padding: 0, font: "inherit", cursor: "pointer", borderBottom: `1.5px dashed ${K.line}`, color: "inherit", ...style }}>{v}</button>;
 
 // ── 案件 ──────────────────────────────────────────────────────────────────────
 export function ProjectsScreen(p) {
@@ -179,17 +159,18 @@ export function PLLearnScreen(p) {
   const [mode, setMode] = useState("monthly");
   const fiscalNum = master.company.fiscalNum || 1;
   const months = mode === "annual" ? fiscalMonths : [selMonth];
-  const { S, revenue, cogsRows, cogs, gross, sgaByAcc, sga, op, nonOp, ordinary, taxRate, tax, net } = plNumbers({ sales, expenses, accounts: master.accounts, months, taxRate: master.company.taxRate || 25 });
+  const { S, revenue, cogsRows, purchases, inv, cogs, gross, sgaByAcc, sga, op, interest, ordinary, taxRate, tax, net, pending } = plNumbers({ sales, expenses, accounts: master.accounts, months, taxRate: master.company.taxRate || 25, ext: p.ext || {} });
   const period = mode === "annual" ? `第${fiscalNum}期 年間累計（${fiscalMonths[0]}〜${fiscalMonths[11]}）` : `${selMonth}分`;
 
   const lines = [
     { k: "rev", label: "売上高", v: revenue, kind: "total", why: "本業で得た収入の合計。ここから費用を順に引いて、5つの利益を出していきます。", rows: S.map((r) => ({ 相手先: r.client, 何月分: r.month, 金額: val(r.amount) })) },
-    { k: "cogs", label: "売上原価", v: cogs, kind: "minus", why: "売上を作るために直接かかった費用（仕入れ・材料など）。勘定科目「売上原価」の合計です。", rows: cogsRows.map((r) => ({ 相手先: r.client, 何月分: r.month, 金額: val(r.amount) })) },
+    { k: "cogs", label: "売上原価", v: cogs, kind: "minus", why: "売上を作るために直接かかった費用（仕入れ・材料など）。\n在庫を入れている月は「期首の在庫 ＋ 仕入れ − 期末の在庫」で計算します。売れ残った分は費用にしません。", formula: inv ? `期首の在庫 ${val(inv.opening)}\n＋ 仕入れ ${val(purchases)}\nー 期末の在庫 ${val(inv.closing)}\n＝ ${val(cogs)}` : `仕入れ（勘定科目「売上原価」）${val(purchases)}\n期末の在庫が未入力のため、在庫の調整はしていません`, rows: cogsRows.map((r) => ({ 相手先: r.client, 何月分: r.month, 金額: val(r.amount) })) },
     { k: "gross", label: "売上総利益（粗利）", v: gross, kind: "profit", ratio: ["粗利率", gross], why: "売上高 − 売上原価。商品やサービスそのものが稼ぐ力です。\n粗利率が下がったら、値付けか仕入れを見直すサインです。", formula: `売上高 ${val(revenue)}\nー 売上原価 ${val(cogs)}\n＝ ${val(gross)}` },
     { k: "sga", label: "販売費及び一般管理費（販管費）", v: sga, kind: "minus", why: "会社を動かすためにかかる費用（家賃・通信・広告・外注など）。売上原価以外の経費です。", rows: sgaByAcc.map((x) => ({ 科目: x.label, 件数: `${x.rows.length}件`, 金額: val(x.v) })), sub: sgaByAcc },
     { k: "op", label: "営業利益", v: op, kind: "profit", ratio: ["営業利益率", op], why: "売上総利益 − 販管費。本業でいくら儲かったかを示す、いちばん大事な利益です。", formula: `売上総利益 ${val(gross)}\nー 販管費 ${val(sga)}\n＝ ${val(op)}` },
-    { k: "nonop", label: "営業外収益・費用", v: nonOp, kind: "minus", why: "本業以外のお金の出入り（預金の利息、借入の支払利息など）。\n今のAIBOUではまだ記録していないので 0 円です。" },
-    { k: "ord", label: "経常利益", v: ordinary, kind: "profit", why: "営業利益 ± 営業外の損益。借入の利息なども含めた、ふだんの事業活動の儲けです。", formula: `営業利益 ${val(op)}\n± 営業外 ${val(nonOp)}\n＝ ${val(ordinary)}` },
+    { k: "nonop", label: "営業外費用（支払利息）", v: interest, kind: "minus", why: "本業以外のお金の出入り。今は借入金の支払利息（見込み）を入れています。\n借入金の元金の返済は費用ではありません（借入金という負債が減るだけ）。" },
+    { k: "ord", label: "経常利益", v: ordinary, kind: "profit", why: "営業利益 ± 営業外の損益。借入の利息なども含めた、ふだんの事業活動の儲けです。", formula: `営業利益 ${val(op)}
+ー 支払利息 ${val(interest)}\n＝ ${val(ordinary)}` },
     { k: "tax", label: `法人税等（見込み・税率${taxRate}%）`, v: tax, kind: "minus", why: `利益にかかる税金の概算です。経常利益 × ${taxRate}%（会社・口座・科目の設定）で計算しています。\n実際の税額は税理士の申告で決まります。`, formula: `経常利益 ${val(ordinary)} × ${taxRate}%\n＝ ${val(tax)}（利益がマイナスなら 0）` },
     { k: "net", label: "当期純利益（見込み）", v: net, kind: "profit", big: true, why: "最終的に会社に残る利益。貸借対照表の「利益の積み上げ（純資産）」を増やします。", formula: `経常利益 ${val(ordinary)}\nー 法人税等 ${val(tax)}\n＝ ${val(net)}` },
   ];
@@ -212,6 +193,7 @@ export function PLLearnScreen(p) {
           <select value={selMonth} onChange={(e) => setSelMonth(e.target.value)} style={{ border: `1px solid ${K.line}`, borderRadius: 8, padding: "8px 10px", fontSize: 16 }}>{fiscalMonths.map((m) => <option key={m} value={m}>{m}分</option>)}</select>
         </label>
       )}
+      {pending > 0 && <p className="note-warn" style={{ marginTop: 0, marginBottom: 12 }}>減価償却の扱いが未確定の資産が{pending}件あります（通常の減価償却で見込みを出しています）。<button className="btn-sub sm" style={{ marginLeft: 8 }} onClick={() => setScreen("zeirishi")}>税理士に確認すること</button></p>}
       <div className="card" style={{ overflow: "hidden" }}>
         <div style={{ padding: "10px 16px", background: K.soft, fontSize: 13, color: K.sub, fontWeight: 700 }}>{period}</div>
         {lines.map((l) => (
@@ -248,7 +230,8 @@ export function BSScreen(p) {
   const [edit, setEdit] = useState(opening === null);
   const [cashIn, setCashIn] = useState(opening === null ? "" : String(opening));
   const [capIn, setCapIn] = useState(String(master.company.capital || ""));
-  const { received, paid, cash, arRows, apRows, ar, ap, assets, liab, equity, capital, retained } = bsNumbers({ sales, expenses, months: fiscalMonths, openingCash: opening, capital: master.company.capital });
+  const nowM = (() => { const d = new Date(); return `${d.getFullYear()}年${d.getMonth() + 1}月`; })();
+  const { received, paid, loanIn, loanOut, cash, arRows, apRows, ar, ap, stock, fixedRows, fixed, loanRows, loanBal, assets, liab, equity, capital, retained } = bsNumbers({ sales, expenses, months: fiscalMonths, openingCash: opening, capital: master.company.capital, now: nowM, ext: p.ext || {} });
   const save = () => {
     const c = cashIn.replace(/[,，円¥\s]/g, ""); const k = capIn.replace(/[,，円¥\s]/g, "");
     if (c === "" || isNaN(Number(c))) { showToast("期首の現金・預金の残高を数字で入れてください", "error"); return; }
@@ -285,18 +268,21 @@ export function BSScreen(p) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 10 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: K.sub, marginBottom: 6 }}>資産（持っているもの）</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, height: 260 }}>
-              {block("現金・預金", cash, "#DCE7F7", "#16295E", () => setModal({ title: "現金・預金（見込み）", amount: val(cash), formula: `期首の残高 ${val(opening || 0)}\n＋ 今期に入金済の売上 ${val(sum(received))}\nー 今期に支払済の経費 ${val(sum(paid))}\n＝ ${val(cash)}`, note: "記録をもとにした見込みです。通帳の残高と合わないときは、記録の漏れがないか確かめてください。" }))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, height: 300 }}>
+              {block("現金・預金", cash, "#DCE7F7", "#16295E", () => setModal({ title: "現金・預金（見込み）", amount: val(cash), formula: `期首の残高 ${val(opening || 0)}\n＋ 今期に入金済の売上 ${val(sum(received))}\nー 今期に支払済の経費 ${val(sum(paid))}\n＋ 今期に借りたお金 ${val(loanIn)}\nー 今期の返済（元金＋利息）${val(loanOut)}\n＝ ${val(cash)}`, note: "記録をもとにした見込みです。通帳の残高と合わないときは、記録の漏れがないか確かめてください。" }))}
               {block("売掛金（未入金）", ar, "#EEF3FB", "#16295E", () => setModal({ title: "売掛金", amount: val(ar), rows: arRows.map((r) => ({ 相手先: r.client, 何月分: r.month, 金額: val(r.amount) })) }))}
+              {stock > 0 && block("在庫", stock, "#EEF3FB", "#16295E", () => setModal({ title: "在庫", amount: val(stock), note: "「資産・借入・在庫」で入れた、直近の月末の在庫です。" }))}
+              {fixed > 0 && block("固定資産（長く使うもの）", fixed, "#E8EDF8", "#16295E", () => setModal({ title: "固定資産", amount: val(fixed), rows: fixedRows.map((x) => ({ 名前: x.a.name, 金額: val(x.v) })), note: "取得価額から、これまでの減価償却費を引いた残り（帳簿価額）です。土地は買った金額のままです。" }))}
             </div>
             <div style={{ marginTop: 8, fontWeight: 700 }}>資産の合計 {val(assets)}</div>
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: K.sub, marginBottom: 6 }}>負債と純資産（お金の出どころ）</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, height: 260 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, height: 300 }}>
               {block("未払金（負債）", ap, "#FBE9E7", "#7A2018", () => setModal({ title: "未払金", amount: val(ap), rows: apRows.map((r) => ({ 相手先: r.client, 科目: r.account, 金額: val(r.amount) })) }))}
+              {loanBal > 0 && block("借入金（負債）", loanBal, "#FBE9E7", "#7A2018", () => setModal({ title: "借入金", amount: val(loanBal), rows: loanRows.map((x) => ({ 借入先: x.l.lender, 金額: val(x.v) })) }))}
               {block("資本金（純資産）", capital, "#E3F3EC", "#0F5640", () => setModal({ title: "資本金", amount: val(capital), note: "会社を作ったときなどに入れたお金です。「会社・口座・科目」の設定の値を使っています。" }))}
-              {block("利益の積み上げ（純資産）", retained, retained < 0 ? "#FBE4E2" : "#D2EDE1", retained < 0 ? "#7A2018" : "#0F5640", () => setModal({ title: "利益の積み上げ（利益剰余金）", amount: val(retained), formula: `資産の合計 ${val(assets)}\nー 負債（未払金）${val(liab)}\nー 資本金 ${val(capital)}\n＝ ${val(retained)}`, note: "これまでに会社に残った利益の合計にあたります。PLの当期純利益が出るほど増えます。" }))}
+              {block("利益の積み上げ（純資産）", retained, retained < 0 ? "#FBE4E2" : "#D2EDE1", retained < 0 ? "#7A2018" : "#0F5640", () => setModal({ title: "利益の積み上げ（利益剰余金）", amount: val(retained), formula: `資産の合計 ${val(assets)}\nー 負債（未払金・借入金）${val(liab)}\nー 資本金 ${val(capital)}\n＝ ${val(retained)}`, note: "これまでに会社に残った利益の合計にあたります。PLの当期純利益が出るほど増えます。" }))}
             </div>
             <div style={{ marginTop: 8, fontWeight: 700 }}>負債と純資産の合計 {val(liab + equity)}</div>
           </div>
@@ -310,7 +296,7 @@ export function BSScreen(p) {
         <span>純資産</span><Why label="純資産">{"資本金と、これまでに残った利益の積み上げ。返さなくてよい、自分のお金です。\n純資産 ＝ 資産 − 負債"}</Why>
         <span>PLとのつながり</span><Why label="PLとのつながり">{"PLで当期純利益が出ると、その分だけ純資産（利益の積み上げ）が増えます。\n赤字が続くと純資産が減り、マイナスになると「債務超過」です。"}</Why>
       </div>
-      <p className="muted">借入金・設備（固定資産）・在庫は、まだ記録していません。今は「現金・預金」「売掛金」「未払金」から作る簡易版です。</p>
+      <p className="muted">在庫は直近の月末に入れた数字、固定資産は帳簿価額、借入金は返済予定からの残高です。いずれも記録をもとにした見込みです。<button className="btn-sub sm" style={{ marginLeft: 8 }} onClick={() => setScreen("assets")}>資産・借入・在庫を開く</button></p>
       <button className="btn-sub sm" onClick={() => setScreen("pl")}>損益計算書を見る</button>
     </div>
   );

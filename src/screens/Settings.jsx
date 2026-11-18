@@ -10,6 +10,8 @@ export function SettingsScreen({ setScreen, taxMode, setTaxMode, opInvoice, show
     ["projects","doc","案件","案件ごとの粗利・利益、未設定の確認"],
     ["pl","list","損益計算書（PL）","月ごと・1年の成績表と5つの利益"],
     ["bs","list","貸借対照表（BS）","会社の財産の一覧（資産・負債・純資産）"],
+    ["assets","doc","資産・借入・在庫","長く使うもの・借入金・月末の在庫"],
+    ["zeirishi","doc","税理士に確認すること","判断待ちの扱いと聞きたいことの一覧"],
     ["ar","yen","未入金・未払金","まとめて確認する"],
     ["master","gear","会社・口座・勘定科目","請求書に出る情報など"],
   ];
