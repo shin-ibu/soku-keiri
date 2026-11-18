@@ -26,8 +26,8 @@ export function HomeScreen({ setScreen, totalSales, totalExp, opProfit, ar, ap, 
   const inList = unpS.map(r => ({ r, due: dueOf(r) })).sort((a,b) => (a.due||"9") .localeCompare(b.due||"9"));
   const late = inList.filter(x => x.due && x.due < td).length;
   const mdJp = (d) => { const [, m, dd] = String(d||"").split("-").map(Number); return m ? `${m}月${dd}日` : ""; };
-  const markIn = (id) => { setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r)); showToast("入金済みにしました"); };
-  const markOut = (id) => { setExpenses(p=>p.map(e=>e.id===id?{...e,status:"支払済"}:e)); showToast("支払済みにしました"); };
+  const markIn = (id) => { setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r)); showToast("入金済にしました"); };
+  const markOut = (id) => { setExpenses(p=>p.map(e=>e.id===id?{...e,status:"支払済"}:e)); showToast("支払済にしました"); };
   const todo = Math.min(inList.length, 3) + Math.min(unpE.length, 3);
   const mo = monthShort(selMonth);
 

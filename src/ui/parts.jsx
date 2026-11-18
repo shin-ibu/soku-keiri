@@ -116,6 +116,11 @@ export function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, sho
             {screen === item.id && <span style={{ marginLeft:"auto", width:3, height:18, borderRadius:2, background:T.pri, display:"block" }} />}
           </button>
         ))}
+        {opInvoice && <button onClick={() => setScreen("estimate")} style={{ display:"flex", alignItems:"center", gap:12, width:"100%", padding:"10px 14px", borderRadius:12, border:"none", cursor:"pointer", background: screen==="estimate" ? T.priSoft : "transparent", color: screen==="estimate" ? T.priDark : T.sub, fontSize:15, fontWeight:600, marginBottom:2, textAlign:"left" }}>
+              <span style={{ fontSize:15, width:20, textAlign:"center" }}>✦</span>
+              見積書
+              {screen === "estimate" && <span style={{ marginLeft:"auto", width:3, height:18, borderRadius:2, background:T.pri, display:"block" }} />}
+            </button>}
         {opInvoice
           ? <button onClick={() => setScreen("invoice")} style={{ display:"flex", alignItems:"center", gap:12, width:"100%", padding:"10px 14px", borderRadius:12, border:"none", cursor:"pointer", background: screen==="invoice" ? T.priSoft : "transparent", color: screen==="invoice" ? T.priDark : T.sub, fontSize:15, fontWeight:600, marginBottom:2, textAlign:"left" }}>
               <span style={{ fontSize:15, width:20, textAlign:"center" }}>✦</span>
@@ -153,7 +158,7 @@ export function BottomNav({ screen, setScreen, onPlus }) {
   const on = (ids) => ids.includes(screen);
   const items = [
     ["talk","chat","AIBOU",["talk","home"]], ["records","list","記録",["records","sales","expenses"]], null,
-    ["cashflow","chart","お金の流れ",["cashflow"]], ["settings","gear","設定",["settings","partners","pl","bs","projects","assets","zeirishi","ar","master","invoice","invoice-new"]],
+    ["cashflow","chart","お金の流れ",["cashflow"]], ["settings","gear","設定",["settings","partners","pl","bs","projects","assets","zeirishi","ar","master","invoice","invoice-new","estimate","estimate-new"]],
   ];
   return (
     <nav className="bottom-nav" aria-label="メニュー">

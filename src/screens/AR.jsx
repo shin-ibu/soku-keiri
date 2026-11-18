@@ -6,13 +6,16 @@ export function ARScreen({ sales, setSales, expenses, setExpenses, val, showToas
   const unpS=sales.filter(s=>s.status==="未入金"), paidS=sales.filter(s=>s.status==="入金済");
   const unpE=expenses.filter(e=>e.status==="未払い"), paidE=expenses.filter(e=>e.status==="支払済");
   const arT=unpS.reduce((s,r)=>s+r.amount,0), apT=unpE.reduce((s,r)=>s+r.amount,0);
-  const mS=(id)=>{setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r));showToast("入金済みにしました");};
-  const mE=(id)=>{setExpenses(p=>p.map(e=>e.id===id?{...e,status:"支払済"}:e));showToast("支払済みにしました");};
-  const Row = ({ r, sub, btn, onBtn, done, color, kind }) => (
+  const mS=(id)=>{setSales(p=>p.map(r=>r.id===id?{...r,status:"入金済"}:r));showToast("入金済にしました");};
+  const mE=(id)=>{setExpenses(p=>p.map(e=>e.id===id?{...e,status:"支払済"}:e));showToast("支払済にしました");};
+  // まちがえて済にしたときは戻せる
+  const uS=(id)=>{setSales(p=>p.map(r=>r.id===id?{...r,status:"未入金"}:r));showToast("未入金に戻しました");};
+  const uE=(id)=>{setExpenses(p=>p.map(e=>e.id===id?{...e,status:"未払い"}:e));showToast("未払いに戻しました");};
+  const Row = ({ r, sub, btn, onBtn, done, color, kind, undo, onUndo }) => (
     <div className="todo">
       <div className="c"><b>{r.client}</b><small>{sub}</small></div>
       <div className="m"><N v={val(r.amount)} setModal={setModal} style={{ fontSize:16, fontWeight:700, color: done ? T.sub : color, borderBottom:"none" }} modal={{ title:`${r.client}　${kind}`, amount:val(r.amount), rows:[{ "相手先":r.client, "何月分":r.month, "内容":r.account || r.memo || "—" }] }} /></div>
-      {btn ? <button className="btn-sub sm" onClick={onBtn}>{btn}</button> : <span className="st ok">{done}</span>}
+      {btn ? <button className="btn-sub sm" onClick={onBtn}>{btn}</button> : (undo ? <button className="btn-sub sm" onClick={onUndo}>{undo}</button> : <span className="st ok">{done}</span>)}
     </div>
   );
   return (
@@ -27,10 +30,10 @@ export function ARScreen({ sales, setSales, expenses, setExpenses, val, showToas
             {unpS.length===0 && <div className="empty">未入金はありません</div>}
             {unpS.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${typeLabel(r.type)}`} btn="入金済にする" onBtn={()=>mS(r.id)} color="#7A4F00" kind="未入金" />)}
           </div>
-          <h2 className="sec-h">入金済み</h2>
+          <h2 className="sec-h">入金済</h2>
           <div className="card list">
             {paidS.length===0 && <div className="empty">まだありません</div>}
-            {paidS.map(r => <Row key={r.id} r={r} sub={`${r.month}分${r.memo ? `・${r.memo}` : ""}`} done="入金済" kind="入金済" />)}
+            {paidS.map(r => <Row key={r.id} r={r} sub={`${r.month}分${r.memo ? `・${r.memo}` : ""}`} done="入金済" kind="入金済" undo="未入金に戻す" onUndo={()=>uS(r.id)} />)}
           </div>
         </div>
         <div className="ar-col" data-off={arTab!=="out" ? "1" : undefined} style={{ minWidth:0 }}>
@@ -39,10 +42,10 @@ export function ARScreen({ sales, setSales, expenses, setExpenses, val, showToas
             {unpE.length===0 && <div className="empty">未払金はありません</div>}
             {unpE.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${r.account}`} btn="支払済にする" onBtn={()=>mE(r.id)} color="#B3261E" kind="未払金" />)}
           </div>
-          <h2 className="sec-h">支払済み</h2>
+          <h2 className="sec-h">支払済</h2>
           <div className="card list">
             {paidE.length===0 && <div className="empty">まだありません</div>}
-            {paidE.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${r.account}`} done="支払済" kind="支払済" />)}
+            {paidE.map(r => <Row key={r.id} r={r} sub={`${r.month}分・${r.account}`} done="支払済" kind="支払済" undo="未払いに戻す" onUndo={()=>uE(r.id)} />)}
           </div>
         </div>
       </div>

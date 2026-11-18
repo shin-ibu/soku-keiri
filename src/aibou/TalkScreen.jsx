@@ -40,7 +40,7 @@ function useStatus({ sales, opProfit, selMonth, invoices }) {
 }
 
 // AIBOUから今日伝えること（データから毎回作る）
-function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths = [], assets = [], notes = [], master, inventory = {} }) {
+function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths = [], assets = [], notes = [], master, inventory = {}, estimates = [] }) {
   const out = [];
   const dueOf = (r) => { const inv = r.invoiceId && invoices.find((v) => v.id === r.invoiceId); return inv && inv.dueDate ? inv.dueDate : ""; };
   out.push({ id: "b-report", who: "aibou", tag: "報告", text: `${selMonth}の売上は${man(totalSales)}、経費は${man(totalExp)}です。` });
@@ -55,6 +55,13 @@ function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMon
   });
   const restAr = unpaid.length - soon.slice(0, 2).length;
   if (restAr > 0) out.push({ id: "b-ar-rest", who: "aibou", tag: "連絡", text: `未入金の売上が、ほかに${restAr}件あります（合計${yen(unpaid.filter((r) => !soon.slice(0, 2).includes(r)).reduce((s, r) => s + r.amount, 0))}）。`, actions: [{ label: "一覧を見る", act: "go", to: "ar", tab: "in" }] });
+
+  // 見積もりの追いかけ：出して14日たっても返事がない、または有効期限が近い・過ぎた
+  estimates.filter((q) => q.status === "見積中").filter((q) => { const age = -daysUntil(q.issueDate); const v = daysUntil(q.validUntil); return age >= 14 || (v !== null && v <= 3); }).slice(0, 2).forEach((q) => {
+    const v = daysUntil(q.validUntil);
+    const when = v !== null && v < 0 ? `有効期限（${md(q.validUntil)}）を過ぎています` : v !== null && v <= 3 ? `有効期限は${md(q.validUntil)}です` : `出してから${-daysUntil(q.issueDate)}日たちました`;
+    out.push({ id: `b-est-${q.id}`, who: "aibou", tag: "相談", waiting: true, text: `${q.client}への見積もり（${q.subject || q.no}・${yen(q.calc.total)}）、${when}。返事はありましたか？`, actions: [{ label: "見積書を開く", act: "go", to: "estimate", primary: true }] });
+  });
 
   const ap = expenses.filter((e) => e.status === "未払い");
   if (ap.length) out.push({ id: "b-ap", who: "aibou", tag: "連絡", text: `未払いの経費が${ap.length}件、合計${yen(ap.reduce((s, e) => s + e.amount, 0))}あります。`, actions: [{ label: "一覧を見る", act: "go", to: "ar", tab: "out" }] });
@@ -95,6 +102,7 @@ function replyTo(text, ctx) {
   if (/税理士/.test(t)) return { text: "税理士に確認することの一覧を開きます。", go: "zeirishi" };
   if (/見本.*(消|始)|消して始める/.test(t)) return { text: "見本を消しました。これからは自分の数字で見られます。", act: "clearDemo" };
   if (/このまま見る/.test(t)) return { text: "わかりました。見本はいつでも「設定」から消せます。" };
+  if (/見積/.test(t)) return { text: "見積書の画面を開きます。受注・失注もここで決められます。", go: "estimate" };
   if (/請求書/.test(t)) return { text: "請求書の画面を開きます。", go: "invoice" };
   if (/経費|レシート|領収書|払った/.test(t)) return { text: "経費の入力を開きます。入れ終わったら、こちらに戻ってきてください。", entry: "expenses" };
   if (/売上|売り上げ/.test(t)) return { text: "売上の入力を開きます。", entry: "sales" };
@@ -107,7 +115,7 @@ function replyTo(text, ctx) {
   if (/損益|PL|ＰＬ|成績/.test(t)) return { text: "損益計算書を開きます。行の「?」で、それぞれの利益の意味が見られます。", go: "pl" };
   if (/貸借|BS|ＢＳ|財産/.test(t)) return { text: "貸借対照表を開きます。", go: "bs" };
   if (/ありがと/.test(t)) return { text: "どういたしまして。ほかにもあれば、いつでもどうぞ。" };
-  return { text: `「${text}」を受け取りました。まだAIにつながる前の版なので、今は「売上」「経費」「請求書」「入金」「利益」「お金の流れ」「取引先」などの言葉で動けます。` };
+  return { text: `「${text}」を受け取りました。まだAIにつながる前の版なので、今は「売上」「経費」「見積書」「請求書」「入金」「利益」「お金の流れ」「取引先」などの言葉で動けます。` };
 }
 
 const Mark = ({ size = 18 }) => (
@@ -167,14 +175,14 @@ function Bubble({ m, onAction }) {
 }
 
 export default function TalkScreen(p) {
-  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab, projects = [], fiscalMonths = [], assets = [], notes = [], setNotes, inventory = {}, setExpenses, setMaster, openAssetFromExpense, setAssetsTab } = p;
+  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab, projects = [], fiscalMonths = [], assets = [], notes = [], setNotes, inventory = {}, setExpenses, setMaster, openAssetFromExpense, setAssetsTab, estimates = [] } = p;
   const [log, setLog] = useState(loadTalk);
   const [draft, setDraft] = useState("");
   const [listening, setListening] = useState(false);
   const endRef = useRef(null);
   const recRef = useRef(null);
   const status = useStatus({ sales, opProfit, selMonth, invoices });
-  const briefing = useMemo(() => buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory }), [sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory]);
+  const briefing = useMemo(() => buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory, estimates }), [sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory, estimates]);
   const owner = master?.company?.name ? `${master.company.name}の相棒` : "社長の相棒";
 
   useEffect(() => { saveTalk(log); }, [log]);
@@ -208,7 +216,13 @@ export default function TalkScreen(p) {
     if (a.act === "markPaid") {
       const row = sales.find((s) => s.id === a.id);
       setSales((prev) => prev.map((s) => (s.id === a.id ? { ...s, status: "入金済" } : s)));
-      push({ who: "me", text: a.label }, { who: "aibou", tag: "報告", text: row ? `${row.client}の${yen(row.amount)}を入金済みにしました。` : "入金済みにしました。" });
+      push({ who: "me", text: a.label }, { who: "aibou", tag: "報告", text: row ? `${row.client}の${yen(row.amount)}を入金済にしました。` : "入金済にしました。", actions: [{ label: "まちがえたので未入金に戻す", act: "markUnpaid", id: a.id }] });
+      return;
+    }
+    if (a.act === "markUnpaid") {
+      const row = sales.find((s) => s.id === a.id);
+      setSales((prev) => prev.map((s) => (s.id === a.id ? { ...s, status: "未入金" } : s)));
+      push({ who: "me", text: a.label }, { who: "aibou", tag: "報告", text: row ? `${row.client}の${yen(row.amount)}を未入金に戻しました。` : "未入金に戻しました。" });
       return;
     }
     if (a.act === "clearDemo") { push({ who: "me", text: a.label }, { who: "aibou", text: "見本を消しました。これからは自分の数字で見られます。" }); clearDemo(); return; }

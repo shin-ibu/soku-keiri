@@ -5,6 +5,7 @@ import { T } from "../ui/theme.js";
 export function SettingsScreen({ setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master }) {
   const items = [
     ["partners","people","取引先","名前・敬称・振込先口座"],
+    ["estimate","doc","見積書", opInvoice ? "見積書を作る・受注／失注・請求書にする" : "オプション（未契約）"],
     ["invoice","doc","請求書", opInvoice ? "発行した請求書・新しく作る" : "オプション（未契約）"],
     ["home","home","数字のまとめ","今月の利益・未入金・今日やること"],
     ["projects","doc","案件","案件ごとの粗利・利益、未設定の確認"],
@@ -20,7 +21,7 @@ export function SettingsScreen({ setScreen, taxMode, setTaxMode, opInvoice, show
       <ScreenHead title="設定" />
       <div className="card list">
         {items.map(([id, ic, t, sub]) => (
-          <button key={id} className="menu-row" onClick={() => (id==="invoice" && !opInvoice) ? showOPModal() : setScreen(id)}>
+          <button key={id} className="menu-row" onClick={() => ((id==="invoice" || id==="estimate") && !opInvoice) ? showOPModal() : setScreen(id)}>
             <span className="ic"><Ic n={ic} /></span><span className="c"><b>{t}</b><small>{sub}</small></span><Ic n="chev" size={20} color={T.faint} />
           </button>
         ))}

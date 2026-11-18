@@ -1,14 +1,21 @@
 import { useState, useEffect } from "react";
 import { ProjectField } from "../aibou/keiei.jsx";
+import { matchEstimates, remainingOf, estimateStatusAfter } from "../lib/estimate.js";
 import { suggestProject } from "../aibou/keieiLogic.js";
-import { today, monthOfDate } from "../lib/format.js";
+import { today, monthOfDate, fmt } from "../lib/format.js";
 import { getSuggestion, typeLabel } from "../lib/master.js";
 import { CpPicker, FR, Ic, Seg, AmountField } from "../ui/parts.jsx";
 import { s } from "../ui/theme.js";
 
-export function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMonths, addCounterparty, onDone, sales=[], expenses=[], projects=[], setProjects=()=>{} }) {
+export function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMonths, addCounterparty, onDone, sales=[], expenses=[], projects=[], setProjects=()=>{}, estimates=[], setEstimates=()=>{}, invoices=[] }) {
   const [form, setForm] = useState({ date:today(), month:monthOfDate(today()), type:"売掛", client:"", amount:"", tax:10, memo:"", status:"未入金" });
   const [showAlert, setShowAlert] = useState(false);
+  const [dismissed, setDismissed] = useState([]);
+  const [noEst, setNoEst] = useState(false);
+  // 見積もりとの照合（「これですか？」）。売上は税込で入るので、見積もりの税込額と比べる
+  const linkedEst = form.estimateId ? estimates.find(x => x.id === form.estimateId) : null;
+  const cands = (!linkedEst && !noEst && form.client && Number(form.amount) > 0) ? matchEstimates(estimates, invoices, { client:form.client, amount:Number(form.amount) }, sales).filter(c => c.kind !== "open" && c.kind !== "over" && !dismissed.includes(c.est.id)).slice(0, 2) : [];
+  const pickEst = (est) => { setForm(f => ({ ...f, estimateId:est.id, client: est.client, project: est.projectId ?? f.project, memo: f.memo || est.subject || "" })); showToast(`見積もり ${est.no} とつなげました`); };
   const sf = (k,v) => setForm(f=>({...f,[k]:v}));
   const sug = suggestProject({ kind:"sale", client:form.client, sales, expenses, projects });
   // 金額がこの月の平均と大きく違うときは、保存の前に一度だけ確かめる
@@ -22,9 +29,15 @@ export function SaleForm({ setSales, setSelMonth, showToast, curSales, master, f
     if (force!==true && !showAlert && isOutlier()) { setShowAlert(true); return; }
     setShowAlert(false);
     const project = form.project !== undefined ? form.project : (sug ? sug.value : null);
-    setSales(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "入金済" : "未入金", project }]); setSelMonth(form.month);
+    const rec = { ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "入金済" : "未入金", project };
+    setSales(p=>[...p,rec]); setSelMonth(form.month);
+    if (form.estimateId) {
+      setEstimates(es => es.map(x => x.id === form.estimateId ? { ...x, status: estimateStatusAfter(x, invoices, [...sales, rec]) } : x));
+      if (linkedEst && linkedEst.projectId) setProjects(ps => ps.map(x => x.id === linkedEst.projectId && x.status === "見積中" ? { ...x, status:"進行中" } : x));
+    }
+    setDismissed([]); setNoEst(false);
     setForm({ date:today(),month:monthOfDate(today()),type:"売掛",client:"",amount:"",tax:10,memo:"",status:"未入金" });
-    showToast((form.type==="現金" ? "売上を保存しました（入金済み）" : "売上を保存しました（未入金）") + (project===null ? "。案件は未設定です" : ""));
+    showToast((form.type==="現金" ? "売上を保存しました（入金済）" : "売上を保存しました（未入金）") + (project===null ? "。案件は未設定です" : ""));
     if (onDone) onDone();
   };
   return (
@@ -43,6 +56,26 @@ export function SaleForm({ setSales, setSelMonth, showToast, curSales, master, f
         <FR label="入金のしかた" hint={"現金：その場で入金 → 入金済で登録します\n売掛（後日入金）・カード：入金前 → 未入金で登録します"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","売掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
         <FR label="消費税"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>税率 10%（標準）</option><option value={8}>税率 8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
       </div>
+      {linkedEst && (
+        <div style={{ background:"#E3F3EC", border:"1px solid #A9D9C3", borderRadius:12, padding:"10px 14px", fontSize:14, lineHeight:1.6, marginTop:4 }}>
+          見積もり <b>{linkedEst.no}</b>（{linkedEst.subject || linkedEst.client}・{fmt(linkedEst.calc.total)}）の売上として入れます。
+          {Number(form.amount) !== remainingOf(linkedEst, invoices, sales) && <><br />見積もりの残り {fmt(remainingOf(linkedEst, invoices, sales))} との差：{fmt(Number(form.amount) - remainingOf(linkedEst, invoices, sales))}</>}
+          <button className="btn-sub sm" style={{ marginLeft:8 }} onClick={() => sf("estimateId", undefined)}>外す</button>
+        </div>
+      )}
+      {cands.length > 0 && (
+        <div className="card pad" style={{ border:"2px solid #233E8B", marginTop:4 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}><span style={{ fontSize:12, fontWeight:700, padding:"2px 8px", borderRadius:999, background:"#233E8B", color:"#fff" }}>AIBOU</span><b>この見積もりの売上ですか？</b></div>
+          {cands.map(c => (
+            <div key={c.est.id} style={{ borderTop:"1px solid #EEF0F3", padding:"8px 0", display:"grid", gap:6 }}>
+              <div style={{ fontSize:15 }}><b>{c.est.no}</b>　{c.est.subject || "（件名なし）"}　{fmt(c.est.calc.total)}</div>
+              <div style={{ fontSize:14, color: c.kind === "same" ? "#0F5640" : "#7A4F00" }}>{c.label}</div>
+              <div style={{ display:"flex", gap:8 }}><button className="btn-pri sm" onClick={() => pickEst(c.est)}>これです</button><button className="btn-sub sm" onClick={() => setDismissed(d => [...d, c.est.id])}>違う</button></div>
+            </div>
+          ))}
+          <button className="btn-sub sm" style={{ marginTop:4 }} onClick={() => setNoEst(true)}>見積もりなし</button>
+        </div>
+      )}
       {showAlert && <div style={s.alertBox} role="alert">この月のほかの金額と大きく違います。金額が合っていれば、もう一度「この内容で保存」を押してください。</div>}
       <button className="btn-main" onClick={()=>doSave(showAlert)}>この内容で保存</button>
     </div>
@@ -73,7 +106,7 @@ export function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, maste
     setExpenses(p=>[...p,rec]); setSelMonth(form.month);
     setFreeText(""); setSuggestion(null);
     setForm({ date:today(),month:monthOfDate(today()),type:"現金",client:"",account:"",amount:"",tax:10,memo:"",status:"未払い" });
-    showToast((form.type==="現金" ? "経費を保存しました（支払済み）" : "経費を保存しました（未払金）") + (project===null ? "。案件は未設定です" : ""));
+    showToast((form.type==="現金" ? "経費を保存しました（支払済）" : "経費を保存しました（未払金）") + (project===null ? "。案件は未設定です" : ""));
     if (onDone) onDone();
     if (longUse && openAssetFromExpense) { openAssetFromExpense({ ...rec, memo: freeText || rec.memo }); setLongUse(false); }
   };
