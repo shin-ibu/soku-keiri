@@ -33,7 +33,7 @@ export function SalesScreen({ setSales, setSelMonth, selMonth, val, showToast, c
                 <td style={{ ...s.td, textAlign:"center" }}>{r.tax}%</td>
                 <td style={{ ...s.td, color:"#aaa" }}>{r.memo}</td>
                 <td style={s.td}><span style={{ ...s.badge, ...(r.status==="入金済"?s.bGreen:s.bAmber) }}>{r.status}</span></td>
-                <td style={{ ...s.td, whiteSpace:"nowrap" }}>{r.status==="未入金"&&<button style={s.paidBtn} onClick={()=>markPaid(r.id)}>入金済にする</button>}{r.status==="入金済"&&<button style={s.paidBtn} onClick={()=>markUnpaid(r.id)}>未入金に戻す</button>} <button style={s.delBtn} aria-label={`${r.client}の売上を消す`} onClick={()=>{ if (window.confirm(`${r.client} ${fmt(r.amount)} を消します。よろしいですか？`)) { setSales(p=>p.filter(x=>x.id!==r.id)); showToast("消しました"); } }}>消す</button></td>
+                <td style={{ ...s.td, whiteSpace:"nowrap" }}>{r.status==="未入金"&&<button style={s.paidBtn} onClick={()=>markPaid(r.id)}>入金済にする</button>}{r.status==="入金済"&&<button style={s.paidBtn} onClick={()=>markUnpaid(r.id)}>未入金に戻す</button>} <button style={s.delBtn} aria-label={`${r.client}の売上を削除`} onClick={()=>{ if (window.confirm(`${r.client} ${fmt(r.amount)} を削除します。よろしいですか？`)) { setSales(p=>p.filter(x=>x.id!==r.id)); showToast("削除しました"); } }}>削除</button></td>
               </tr>
             ))}
           </tbody>
@@ -72,7 +72,7 @@ export function ExpenseScreen({ setExpenses, setSelMonth, selMonth, val, showToa
                 <td style={{ ...s.td, textAlign:"right" }}><N v={val(r.amount)} setModal={setModal} style={{ fontWeight:700 }} modal={{ title:`${r.client} / ${r.account}`, amount:val(r.amount), formula:`税込 ${fmt(r.amount)}\n勘定科目：${r.account}\n区分：${typeLabel(r.type)}`, rows:[{ "相手先":r.client,"日付":r.date,"反映月":r.month,"科目":r.account,"備考":r.memo||"—","状態":r.status }] }} /></td>
                 <td style={{ ...s.td, color:"#aaa" }}>{r.memo}</td>
                 <td style={s.td}><span style={{ ...s.badge, ...(r.status==="支払済"?s.bGreen:s.bRed) }}>{r.status}</span></td>
-                <td style={{ ...s.td, whiteSpace:"nowrap" }}>{r.status==="未払い"&&<button style={{ ...s.paidBtn, borderColor:"#F0B8B3", color:"#B3261E" }} onClick={()=>markPaid(r.id)}>支払済にする</button>}{r.status==="支払済"&&<button style={s.paidBtn} onClick={()=>markUnpaid(r.id)}>未払いに戻す</button>} <button style={s.delBtn} aria-label={`${r.client}の経費を消す`} onClick={()=>{ if (window.confirm(`${r.client} ${fmt(r.amount)} を消します。よろしいですか？`)) { setExpenses(p=>p.filter(x=>x.id!==r.id)); showToast("消しました"); } }}>消す</button></td>
+                <td style={{ ...s.td, whiteSpace:"nowrap" }}>{r.status==="未払い"&&<button style={{ ...s.paidBtn, borderColor:"#F0B8B3", color:"#B3261E" }} onClick={()=>markPaid(r.id)}>支払済にする</button>}{r.status==="支払済"&&<button style={s.paidBtn} onClick={()=>markUnpaid(r.id)}>未払いに戻す</button>} <button style={s.delBtn} aria-label={`${r.client}の経費を削除`} onClick={()=>{ if (window.confirm(`${r.client} ${fmt(r.amount)} を削除します。よろしいですか？`)) { setExpenses(p=>p.filter(x=>x.id!==r.id)); showToast("削除しました"); } }}>削除</button></td>
               </tr>
             ))}
           </tbody>

@@ -12,6 +12,7 @@ import { ARScreen } from "./screens/AR.jsx";
 import { CashflowScreen } from "./screens/Cashflow.jsx";
 import { EntrySheet } from "./screens/Entry.jsx";
 import { HomeScreen } from "./screens/Home.jsx";
+import { YoteiScreen } from "./aibou/yotei.jsx";
 import { InvoiceScreen, InvoiceNew, EstimateScreen, EstimateNew } from "./screens/Invoice.jsx";
 import { SalesScreen, ExpenseScreen } from "./screens/Lists.jsx";
 import { MasterScreen } from "./screens/Master.jsx";
@@ -46,9 +47,10 @@ export default function App() {
   const [assetsTab,   setAssetsTab]   = useState("assets");
   const [estimates,   setEstimates]   = useState(saved?.estimates || []);     // 見積書
   const [estimateSeq, setEstimateSeq] = useState(saved?.estimateSeq || {});
-  const [invoiceFromEstimate, setInvoiceFromEstimate] = useState(null);       // 見積書から請求書を作るときの下書き
+  const [invoiceFromEstimate, setInvoiceFromEstimate] = useState(null);
+  const [events,      setEvents]      = useState(saved?.events || []);        // 予定・やること       // 見積書から請求書を作るときの下書き
 
-  useEffect(() => { saveAll({ sales, expenses, master, invoices, invoiceSeq, opInvoice, projects, assets, loans, inventory, notes, estimates, estimateSeq }); }, [sales, expenses, master, invoices, invoiceSeq, opInvoice, projects, assets, loans, inventory, notes, estimates, estimateSeq]);
+  useEffect(() => { saveAll({ sales, expenses, master, invoices, invoiceSeq, opInvoice, projects, assets, loans, inventory, notes, estimates, estimateSeq, events }); }, [sales, expenses, master, invoices, invoiceSeq, opInvoice, projects, assets, loans, inventory, notes, estimates, estimateSeq, events]);
   const showToast = (msg, type="success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
   // 入力欄から、その場で相手先に足す
   const addCounterparty = (name, kind="売り先") => {
@@ -72,11 +74,11 @@ export default function App() {
   const ap          = expenses.filter(e => e.status === "未払い").reduce((s,r) => s + r.amount, 0);
   const val         = (n) => taxMode === "inc" ? fmt(n) : fmtEx(n);
 
-  const shared = { screen, setScreen, taxMode, setTaxMode, sales, setSales, expenses, setExpenses, master, setMaster, selMonth, setSelMonth, totalSales, totalExp, grossProfit, opProfit, ar, ap, val, curSales, curExp, showToast, genka, sga, setModal, opInvoice, showOPModal: () => setShowOPModal(true), fiscalMonths, invoices, setInvoices, invoiceSeq, setInvoiceSeq, addCounterparty, estimates, setEstimates, estimateSeq, setEstimateSeq, invoiceFromEstimate, setInvoiceFromEstimate, arTab, setArTab, projects, setProjects,
+  const shared = { screen, setScreen, taxMode, setTaxMode, sales, setSales, expenses, setExpenses, master, setMaster, selMonth, setSelMonth, totalSales, totalExp, grossProfit, opProfit, ar, ap, val, curSales, curExp, showToast, genka, sga, setModal, opInvoice, showOPModal: () => setShowOPModal(true), fiscalMonths, invoices, setInvoices, invoiceSeq, setInvoiceSeq, addCounterparty, estimates, setEstimates, estimateSeq, setEstimateSeq, invoiceFromEstimate, setInvoiceFromEstimate, events, setEvents, arTab, setArTab, projects, setProjects,
     assets, setAssets, loans, setLoans, inventory, setInventory, notes, setNotes, assetDraft, setAssetDraft, assetsTab, setAssetsTab,
     openAssetFromExpense: (e) => { setAssetDraft({ name: e.memo || e.client || "", cost: e.amount, acquired: e.date || "", start: String(e.date || "").slice(0,7), expenseId: e.id }); setAssetsTab("assets"); setScreen("assets"); },
     ext: { assets, loans, inventory, startMonth: master.company.fiscalMonth || 4, profile: profileOf(master) } };
-  const Screens = { home:HomeScreen, records:RecordsScreen, settings:SettingsScreen, sales:SalesScreen, expenses:ExpenseScreen, pl:PLLearnScreen, projects:ProjectsScreen, bs:BSScreen, assets:AssetsScreen, zeirishi:ZeirishiScreen, ar:ARScreen, cashflow:CashflowScreen, invoice:InvoiceScreen, "invoice-new":InvoiceNew, estimate:EstimateScreen, "estimate-new":EstimateNew, partners:PartnersScreen, master:MasterScreen };
+  const Screens = { home:HomeScreen, records:RecordsScreen, settings:SettingsScreen, sales:SalesScreen, expenses:ExpenseScreen, pl:PLLearnScreen, projects:ProjectsScreen, bs:BSScreen, assets:AssetsScreen, zeirishi:ZeirishiScreen, ar:ARScreen, cashflow:CashflowScreen, invoice:InvoiceScreen, "invoice-new":InvoiceNew, estimate:EstimateScreen, yotei:YoteiScreen, "estimate-new":EstimateNew, partners:PartnersScreen, master:MasterScreen };
   const Screen = Screens[screen] || HomeScreen;
   const hasDemo = sales.some(r=>r.demo) || expenses.some(r=>r.demo) || master.counterparties.some(c=>c.sample) || projects.some(p=>p.demo);
   const clearDemo = () => { setSales(p=>p.filter(r=>!r.demo)); setExpenses(p=>p.filter(r=>!r.demo)); setProjects(p=>p.filter(x=>!x.demo)); setMaster(m=>({ ...m, counterparties: m.counterparties.filter(c=>!c.sample) })); showToast("見本を消しました。自分の数字を入れられます"); };

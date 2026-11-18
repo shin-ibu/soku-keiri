@@ -3,6 +3,7 @@
 // 今はAIにつながる前の版：返事はキーワードに応じた決まった文で返す。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { color, font } from "../ui/tokens.js";
+import { autoItems, itemsForDay, parseScheduleText, dayLabel, workOf, isRestDay, addDays } from "./schedule.js";
 
 const C = {
   bg: color.bg, card: color.card, ink: color.ink, sub: color.sub, line: color.line,
@@ -40,8 +41,29 @@ function useStatus({ sales, opProfit, selMonth, invoices }) {
 }
 
 // AIBOUから今日伝えること（データから毎回作る）
-function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths = [], assets = [], notes = [], master, inventory = {}, estimates = [] }) {
+function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths = [], assets = [], notes = [], master, inventory = {}, estimates = [], events = [] }) {
   const out = [];
+  // 今日の予定（本業の予定と経営の仕事をまとめて）
+  {
+    const today = todayYmd();
+    const auto = autoItems({ sales, expenses, invoices, estimates, inventory, today });
+    const list = itemsForDay(today, { events, auto }).filter((x) => !x.done);
+    const own = list.filter((x) => !x.auto);
+    const lines = own.slice(0, 4).map((x) => `・${x.time || (x.type === "task" ? "やること" : "終日")}　${x.title}`);
+    const keiei = list.filter((x) => x.auto).length;
+    const work = workOf(master);
+    // 明日が休みで、休み明けまでに期限があるものを前もって知らせる
+    let restNote = "";
+    if (isRestDay(addDays(today, 1), work)) {
+      let d = addDays(today, 1), n = 0; const due = [];
+      while (isRestDay(d, work) && n < 7) { due.push(...auto.filter((a) => a.date === d && (a.kind === "支払期限" || a.kind === "入金期限"))); d = addDays(d, 1); n++; }
+      if (due.length) restNote = `\n明日から休みです。休みの間に期限が${due.length}件あります（${due.map((a) => a.title).join("、")}）。今日のうちに確認しておきましょう。`;
+    }
+    const text = list.length
+      ? `今日、${dayLabel(today)}の予定は${own.length}件${keiei ? `、経営の仕事が${keiei}件` : ""}です。${lines.length ? `\n${lines.join("\n")}` : ""}${restNote}`
+      : `今日、${dayLabel(today)}の予定はありません。${restNote}`;
+    out.push({ id: "b-yotei", who: "aibou", tag: restNote ? "連絡" : "報告", text, actions: [{ label: "予定を見る", act: "go", to: "yotei" }] });
+  }
   const dueOf = (r) => { const inv = r.invoiceId && invoices.find((v) => v.id === r.invoiceId); return inv && inv.dueDate ? inv.dueDate : ""; };
   out.push({ id: "b-report", who: "aibou", tag: "報告", text: `${selMonth}の売上は${man(totalSales)}、経費は${man(totalExp)}です。` });
 
@@ -102,6 +124,11 @@ function replyTo(text, ctx) {
   if (/税理士/.test(t)) return { text: "税理士に確認することの一覧を開きます。", go: "zeirishi" };
   if (/見本.*(消|始)|消して始める/.test(t)) return { text: "見本を消しました。これからは自分の数字で見られます。", act: "clearDemo" };
   if (/このまま見る/.test(t)) return { text: "わかりました。見本はいつでも「設定」から消せます。" };
+  // 日付があって、予定らしい言葉（時刻・打ち合わせ・送る など）があれば予定として入れる。質問は除く
+  const question = /[？?]|教えて|いくら|どう|何件/.test(t);
+  const sch = !question && (/予定|スケジュール|打ち合わせ|打合せ|アポ|会議|現場|訪問|やること|リマインド|忘れないように|定例|毎週|毎月/.test(t) || /\d+時/.test(t) || /(送る|出す|払う|支払う|振り込む|連絡する|電話|提出|確認する|作る)/.test(t)) ? parseScheduleText(text, todayYmd()) : null;
+  if (sch) return { text: `${dayLabel(sch.date)}${sch.time ? ` ${sch.time}` : ""}に「${sch.title}」を${sch.repeat === "weekly" ? "毎週の" : sch.repeat === "monthly" ? "毎月の" : sch.repeat === "monthEnd" ? "毎月末の" : ""}${sch.type === "task" ? "やること" : "予定"}として入れました。${isRestDay(sch.date, ctx.work) ? "\nこの日は休みの日です。" : ""}`, act: "addEvent", ev: sch };
+  if (/予定|スケジュール|カレンダー/.test(t)) return { text: "予定の画面を開きます。「明日10時に打ち合わせ」のように話しかけても入れられます。", go: "yotei" };
   if (/見積/.test(t)) return { text: "見積書の画面を開きます。受注・失注もここで決められます。", go: "estimate" };
   if (/請求書/.test(t)) return { text: "請求書の画面を開きます。", go: "invoice" };
   if (/経費|レシート|領収書|払った/.test(t)) return { text: "経費の入力を開きます。入れ終わったら、こちらに戻ってきてください。", entry: "expenses" };
@@ -115,7 +142,7 @@ function replyTo(text, ctx) {
   if (/損益|PL|ＰＬ|成績/.test(t)) return { text: "損益計算書を開きます。行の「?」で、それぞれの利益の意味が見られます。", go: "pl" };
   if (/貸借|BS|ＢＳ|財産/.test(t)) return { text: "貸借対照表を開きます。", go: "bs" };
   if (/ありがと/.test(t)) return { text: "どういたしまして。ほかにもあれば、いつでもどうぞ。" };
-  return { text: `「${text}」を受け取りました。まだAIにつながる前の版なので、今は「売上」「経費」「見積書」「請求書」「入金」「利益」「お金の流れ」「取引先」などの言葉で動けます。` };
+  return { text: `「${text}」を受け取りました。まだAIにつながる前の版なので、今は「予定」「売上」「経費」「見積書」「請求書」「入金」「利益」「お金の流れ」「取引先」などの言葉で動けます。` };
 }
 
 const Mark = ({ size = 18 }) => (
@@ -175,14 +202,14 @@ function Bubble({ m, onAction }) {
 }
 
 export default function TalkScreen(p) {
-  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab, projects = [], fiscalMonths = [], assets = [], notes = [], setNotes, inventory = {}, setExpenses, setMaster, openAssetFromExpense, setAssetsTab, estimates = [] } = p;
+  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab, projects = [], fiscalMonths = [], assets = [], notes = [], setNotes, inventory = {}, setExpenses, setMaster, openAssetFromExpense, setAssetsTab, estimates = [], events = [], setEvents } = p;
   const [log, setLog] = useState(loadTalk);
   const [draft, setDraft] = useState("");
   const [listening, setListening] = useState(false);
   const endRef = useRef(null);
   const recRef = useRef(null);
   const status = useStatus({ sales, opProfit, selMonth, invoices });
-  const briefing = useMemo(() => buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory, estimates }), [sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory, estimates]);
+  const briefing = useMemo(() => buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory, estimates, events }), [sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths, assets, notes, master, inventory, estimates, events]);
   const owner = master?.company?.name ? `${master.company.name}の相棒` : "社長の相棒";
 
   useEffect(() => { saveTalk(log); }, [log]);
@@ -192,6 +219,7 @@ export default function TalkScreen(p) {
 
   const run = (r) => {
     if (r.act === "clearDemo") clearDemo();
+    if (r.act === "addEvent" && setEvents) setEvents((es) => [...es, { id: Date.now(), repeat: "none", memo: "", doneDates: [], ...r.ev }]);
     if (r.act === "addNote" && setNotes) setNotes((ns) => [...ns, { id: Date.now(), text: r.note, answered: false, answer: "" }]);
     if (r.tab && setArTab) setArTab(r.tab);
     if (r.go) setTimeout(() => setScreen(r.go), 600);
@@ -201,7 +229,7 @@ export default function TalkScreen(p) {
   const send = (text) => {
     const t = String(text || "").trim();
     if (!t) return;
-    const r = replyTo(t, { ar, arCount: sales.filter((s) => s.status === "未入金").length, opProfit, selMonth });
+    const r = replyTo(t, { ar, arCount: sales.filter((s) => s.status === "未入金").length, opProfit, selMonth, work: workOf(master) });
     if (r.act === "addNote") r.note = t;
     push({ who: "me", text: t }, { who: "aibou", text: r.text });
     setDraft("");
@@ -259,8 +287,9 @@ export default function TalkScreen(p) {
   const signal = { green: [C.okSoft, C.ok], yellow: [C.warnSoft, C.warn], red: [C.errSoft, C.err] }[status.level];
   const arCount = sales.filter((s) => s.status === "未入金").length;
   const unsetCount = [...sales, ...expenses].filter((r) => fiscalMonths.includes(r.month) && (r.project === undefined || r.project === null)).length;
+  const todayCount = itemsForDay(todayYmd(), { events, auto: autoItems({ sales, expenses, invoices, estimates, inventory, today: todayYmd() }) }).filter((x) => !x.done).length;
   const tiles = [
-    { label: "予定", sub: "準備中", icon: IC.cal, on: () => notReady("予定", "本業の予定と経営の仕事を一緒に並べる画面を作っています。") },
+    { label: "予定", sub: todayCount ? `今日 ${todayCount}件` : "今日はなし", icon: IC.cal, on: () => setScreen("yotei") },
     { label: "入金・支払", sub: arCount ? `未入金 ${arCount}件` : "未入金なし", icon: IC.yen, on: () => { if (setArTab) setArTab("in"); setScreen("ar"); } },
     { label: "収支", sub: "PL・BS", icon: IC.chart, on: () => setScreen("pl") },
     { label: "受け箱", sub: "準備中", icon: IC.inbox, on: () => notReady("受け箱", "請求書やレシートの写真を読み取る仕組みを作っています。") },

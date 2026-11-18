@@ -4,6 +4,7 @@ import { T } from "../ui/theme.js";
 
 export function SettingsScreen({ setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master }) {
   const items = [
+    ["yotei","doc","予定・働き方","予定・やること・休みの曜日と仕事の時間"],
     ["partners","people","取引先","名前・敬称・振込先口座"],
     ["estimate","doc","見積書", opInvoice ? "見積書を作る・受注／失注・請求書にする" : "オプション（未契約）"],
     ["invoice","doc","請求書", opInvoice ? "発行した請求書・新しく作る" : "オプション（未契約）"],

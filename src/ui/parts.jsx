@@ -79,6 +79,7 @@ export function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, sho
   const coName = master?.company?.name || "AIBOU";
   const navItems = [
     { id:"talk",     icon:"◆", label:"AIBOU（トーク）" },
+    { id:"yotei",    icon:"▣", label:"予定" },
     { id:"home",     icon:"◈", label:"ホーム" },
     { id:"records",  icon:"≣", label:"記録" },
     { id:"sales",    icon:"↑", label:"売上の一覧" },
@@ -157,7 +158,7 @@ export function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, sho
 export function BottomNav({ screen, setScreen, onPlus }) {
   const on = (ids) => ids.includes(screen);
   const items = [
-    ["talk","chat","AIBOU",["talk","home"]], ["records","list","記録",["records","sales","expenses"]], null,
+    ["talk","chat","AIBOU",["talk","home","yotei"]], ["records","list","記録",["records","sales","expenses"]], null,
     ["cashflow","chart","お金の流れ",["cashflow"]], ["settings","gear","設定",["settings","partners","pl","bs","projects","assets","zeirishi","ar","master","invoice","invoice-new","estimate","estimate-new"]],
   ];
   return (

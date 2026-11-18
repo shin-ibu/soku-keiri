@@ -12,7 +12,7 @@ export function RecordsScreen(p) {
   const rows = (tab === "sales" ? curSales : curExp).slice().sort((a,b) => String(b.date).localeCompare(String(a.date)));
   const total = rows.reduce((s,r) => s + r.amount, 0);
   const dateJp = (d) => { const [, m, dd] = String(d||"").split("-").map(Number); return m ? `${m}月${dd}日` : ""; };
-  const del = (r) => { if (window.confirm(`${r.client} ${fmt(r.amount)} を消します。よろしいですか？`)) { (tab==="sales" ? setSales : setExpenses)(q => q.filter(x => x.id !== r.id)); setOpenId(null); showToast("消しました"); } };
+  const del = (r) => { if (window.confirm(`${r.client} ${fmt(r.amount)} を削除します。よろしいですか？`)) { (tab==="sales" ? setSales : setExpenses)(q => q.filter(x => x.id !== r.id)); setOpenId(null); showToast("削除しました"); } };
   const paid = (r) => { if (tab === "sales") { setSales(q=>q.map(x=>x.id===r.id?{...x,status:"入金済"}:x)); showToast("入金済にしました"); } else { setExpenses(q=>q.map(x=>x.id===r.id?{...x,status:"支払済"}:x)); showToast("支払済にしました"); } };
   const unpaidBack = (r) => { if (tab === "sales") { setSales(q=>q.map(x=>x.id===r.id?{...x,status:"未入金"}:x)); showToast("未入金に戻しました"); } else { setExpenses(q=>q.map(x=>x.id===r.id?{...x,status:"未払い"}:x)); showToast("未払いに戻しました"); } };
   const invSt = (inv) => { const sale = sales.find(x => x.id === inv.saleId); return sale ? sale.status : null; };
@@ -47,7 +47,7 @@ export function RecordsScreen(p) {
                     <div>
                       {unpaid && <button className="btn-sub" onClick={() => paid(r)}>{tab==="sales" ? "入金済にする" : "支払済にする"}</button>}
                       {!unpaid && <button className="btn-sub" onClick={() => unpaidBack(r)}>{tab==="sales" ? "未入金に戻す" : "未払いに戻す"}</button>}
-                      <button className="btn-del" onClick={() => del(r)}>消す</button>
+                      <button className="btn-del" onClick={() => del(r)}>この記録を削除</button>
                     </div>
                   </div>
                 )}
