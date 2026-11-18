@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import TalkScreen from "./aibou/TalkScreen.jsx";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
@@ -230,6 +231,7 @@ function N({ v, modal, setModal, style }) {
 function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModal, master, selMonth, setSelMonth, fiscalMonths }) {
   const coName = master?.company?.name || "Soku経理";
   const navItems = [
+    { id:"talk",     icon:"◆", label:"AIBOU（トーク）" },
     { id:"home",     icon:"◈", label:"ホーム" },
     { id:"records",  icon:"≣", label:"記録" },
     { id:"sales",    icon:"↑", label:"売上の一覧" },
@@ -299,7 +301,7 @@ function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModa
 function BottomNav({ screen, setScreen, onPlus }) {
   const on = (ids) => ids.includes(screen);
   const items = [
-    ["home","home","ホーム",["home"]], ["records","list","記録",["records","sales","expenses"]], null,
+    ["talk","chat","AIBOU",["talk"]], ["home","home","ホーム",["home"]], ["records","list","記録",["records","sales","expenses"]], null,
     ["cashflow","chart","お金の流れ",["cashflow"]], ["settings","gear","設定",["settings","partners","pl","ar","master","invoice","invoice-new"]],
   ];
   return (
@@ -446,7 +448,7 @@ function DonutChart({ sales, expenses, size, setModal, val }) {
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [saved] = useState(load);
-  const [screen,      setScreen]      = useState("home");
+  const [screen,      setScreen]      = useState("talk");   // AIBOU：最初はトーク画面
   const [taxMode,     setTaxMode]     = useState("inc");
   const [sales,       setSales]       = useState(saved?.sales || shiftDemo(DEMO_SALES));
   const [expenses,    setExpenses]    = useState(saved?.expenses || shiftDemo(DEMO_EXP));
@@ -489,6 +491,17 @@ export default function App() {
   const Screen = Screens[screen] || HomeScreen;
   const hasDemo = sales.some(r=>r.demo) || expenses.some(r=>r.demo) || master.counterparties.some(c=>c.sample);
   const clearDemo = () => { setSales(p=>p.filter(r=>!r.demo)); setExpenses(p=>p.filter(r=>!r.demo)); setMaster(m=>({ ...m, counterparties: m.counterparties.filter(c=>!c.sample) })); showToast("見本を消しました。自分の数字を入れられます"); };
+
+  // AIBOU：トーク画面は全画面で出す（経理の各画面はこれまでどおり）
+  if (screen === "talk") return (
+    <div style={{ fontSize:16, color:T.text, background:"#F2F4F6", minHeight:"100dvh" }}>
+      <style>{css}</style>
+      {toast && <div role="status" className="toast" style={{ background:toast.type==="error"?T.errSoft:T.okSoft, color:toast.type==="error"?"#B42318":"#05603A", borderColor:toast.type==="error"?"#F5B5B5":"#A6E4CC" }}>{toast.msg}</div>}
+      <DrillModal modal={modal} onClose={() => setModal(null)} />
+      <TalkScreen {...shared} onEntry={setEntry} clearDemo={clearDemo} hasDemo={hasDemo} />
+      {entry && <EntrySheet tab={entry} setTab={setEntry} onClose={() => setEntry(null)} {...shared} />}
+    </div>
+  );
 
   return (
     <div style={{ fontFamily:"'Noto Sans JP','Hiragino Sans',sans-serif", fontSize:16, color:T.text, display:"flex", minHeight:"100vh", background:T.bg }}>
@@ -1488,6 +1501,7 @@ function FR({ label, hint, children }) {
 const T = { bg:"#F5F8FB", pri:"#5B8FB9", priDark:"#4A7BA3", priSoft:"#E8F0F7", text:"#111827", sub:"#6B7280", faint:"#9CA3AF", line:"#E5EAF0", card:"#FFFFFF", ok:"#10B981", okSoft:"#E7F7F0", warn:"#F59E0B", warnSoft:"#FEF3E2", err:"#EF4444", errSoft:"#FDECEC", shadow:"0 1px 2px rgba(17,24,39,0.04)" };
 const ICONS = {
   home:"M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z",
+  chat:"M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z",
   list:"M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM8 9h8M8 13h8M8 17h5",
   plus:"M12 5v14M5 12h14",
   chart:"M5 20V12M10 20V7M15 20v-5M20 20V4",
