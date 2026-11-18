@@ -2,7 +2,7 @@
 // 数字の名前と式は機能一覧14章「案件と利益の定義」に合わせる。粗利と利益を混ぜない。
 import { useState } from "react";
 import { color } from "../ui/tokens.js";
-import { PROJECT_STATUSES, ACTIVE, COMMON, sum, useProjectNumbers, openingCashOf } from "./keieiLogic.js";
+import { PROJECT_STATUSES, ACTIVE, COMMON, sum, useProjectNumbers, openingCashOf, plNumbers, bsNumbers } from "./keieiLogic.js";
 
 const pct = (a, b) => (b ? `${Math.round((a / b) * 1000) / 10}%` : "—");
 
@@ -179,21 +179,7 @@ export function PLLearnScreen(p) {
   const [mode, setMode] = useState("monthly");
   const fiscalNum = master.company.fiscalNum || 1;
   const months = mode === "annual" ? fiscalMonths : [selMonth];
-  const S = sales.filter((r) => months.includes(r.month)), E = expenses.filter((r) => months.includes(r.month));
-  const revenue = sum(S);
-  const cogsRows = E.filter((e) => e.account === "売上原価");
-  const cogs = sum(cogsRows);
-  const gross = revenue - cogs;
-  const sgaByAcc = master.accounts.filter((a) => a.category === "sga").map((a) => ({ label: a.label, rows: E.filter((e) => e.account === a.label) })).map((x) => ({ ...x, v: sum(x.rows) })).filter((x) => x.v);
-  const other = E.filter((e) => e.account !== "売上原価" && !master.accounts.some((a) => a.category === "sga" && a.label === e.account));
-  if (other.length) sgaByAcc.push({ label: "その他", rows: other, v: sum(other) });
-  const sga = sgaByAcc.reduce((s, x) => s + x.v, 0);
-  const op = gross - sga;
-  const nonOp = 0;
-  const ordinary = op + nonOp;
-  const taxRate = Number(master.company.taxRate || 25);
-  const tax = ordinary > 0 ? Math.round((ordinary * taxRate) / 100) : 0;
-  const net = ordinary - tax;
+  const { S, revenue, cogsRows, cogs, gross, sgaByAcc, sga, op, nonOp, ordinary, taxRate, tax, net } = plNumbers({ sales, expenses, accounts: master.accounts, months, taxRate: master.company.taxRate || 25 });
   const period = mode === "annual" ? `第${fiscalNum}期 年間累計（${fiscalMonths[0]}〜${fiscalMonths[11]}）` : `${selMonth}分`;
 
   const lines = [
@@ -262,15 +248,7 @@ export function BSScreen(p) {
   const [edit, setEdit] = useState(opening === null);
   const [cashIn, setCashIn] = useState(opening === null ? "" : String(opening));
   const [capIn, setCapIn] = useState(String(master.company.capital || ""));
-  const inFy = (r) => fiscalMonths.includes(r.month);
-  const received = sales.filter((r) => inFy(r) && r.status === "入金済");
-  const paid = expenses.filter((r) => inFy(r) && r.status === "支払済");
-  const cash = (opening || 0) + sum(received) - sum(paid);
-  const arRows = sales.filter((r) => r.status === "未入金"), apRows = expenses.filter((r) => r.status === "未払い");
-  const ar = sum(arRows), ap = sum(apRows);
-  const assets = cash + ar, liab = ap, equity = assets - liab;
-  const capital = Number(master.company.capital || 0);
-  const retained = equity - capital;
+  const { received, paid, cash, arRows, apRows, ar, ap, assets, liab, equity, capital, retained } = bsNumbers({ sales, expenses, months: fiscalMonths, openingCash: opening, capital: master.company.capital });
   const save = () => {
     const c = cashIn.replace(/[,，円¥\s]/g, ""); const k = capIn.replace(/[,，円¥\s]/g, "");
     if (c === "" || isNaN(Number(c))) { showToast("期首の現金・預金の残高を数字で入れてください", "error"); return; }

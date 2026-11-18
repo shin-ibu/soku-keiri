@@ -17,12 +17,12 @@ export const getFiscalMonths = (startMonth, year) => {
   }
   return months;
 };
-export const getFiscalYear = (startMonth, fiscalNum) => {
-  const now = new Date();
+// 今の決算期が始まった年。「第何期」は表示に使うだけで、期間はずらさない
+// （以前は第何期の数だけ過去にずれ、第3期と入れると2年前の12か月が出ていた）
+export const getFiscalYear = (startMonth, fiscalNum, now = new Date()) => {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-  const baseYear = currentMonth >= startMonth ? currentYear : currentYear - 1;
-  return baseYear - (fiscalNum - 1);
+  return currentMonth >= startMonth ? currentYear : currentYear - 1;
 };
 export const fmtK = (n) => n >= 1000000 ? (n/1000000).toFixed(1)+"M" : n >= 1000 ? Math.round(n/1000)+"K" : String(Math.round(n));
 export const yen = (n) => "¥" + Math.round(n || 0).toLocaleString("ja-JP");
