@@ -2,12 +2,13 @@
 // 社長と相棒（AIBOU）のやり取りの場。報告・連絡・相談を出し、社長の言葉には必ず返事をする。
 // 今はAIにつながる前の版：返事はキーワードに応じた決まった文で返す。
 import { useEffect, useMemo, useRef, useState } from "react";
+import { color, font } from "../ui/tokens.js";
 
 const C = {
-  bg: "#F2F4F6", card: "#FFFFFF", ink: "#17212B", sub: "#5B6573", line: "#DFE3E8",
-  pri: "#233E8B", priDark: "#16295E", priSoft: "#E6EBF7",
-  ok: "#17795E", okSoft: "#E3F3EC", warn: "#7A4F00", warnSoft: "#FDF1D6", err: "#B3261E", errSoft: "#FBE4E2",
-  tagSoft: "#EEF0F3", tagInk: "#3D4756",
+  bg: color.bg, card: color.card, ink: color.ink, sub: color.sub, line: color.line,
+  pri: color.pri, priDark: color.priDark, priSoft: color.priSoft,
+  ok: color.ok, okSoft: color.okSoft, warn: color.warnInk, warnSoft: color.warnSoft, err: color.err, errSoft: color.errSoft,
+  tagSoft: color.lineSoft, tagInk: "#3D4756",
 };
 const TALK_KEY = "aibouTalkV1";
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -277,7 +278,7 @@ export default function TalkScreen(p) {
 }
 
 const css = `
-.aibou{ font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif; max-width:640px; margin:0 auto; }
+.aibou{ font-family:${font}; max-width:640px; margin:0 auto; }
 .aibou button{ font-family:inherit; cursor:pointer; }
 .aibou-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 .aibou-icon{ width:44px; height:44px; border-radius:22px; border:1px solid ${C.line}; background:#fff; display:flex; align-items:center; justify-content:center; }

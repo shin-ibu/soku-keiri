@@ -1,13 +1,14 @@
 // AIBOU 経営の画面：案件・損益計算書（PL）・貸借対照表（BS）
 // 数字の名前と式は機能一覧14章「案件と利益の定義」に合わせる。粗利と利益を混ぜない。
 import { useState } from "react";
+import { color } from "../ui/tokens.js";
 import { PROJECT_STATUSES, ACTIVE, COMMON, sum, useProjectNumbers, openingCashOf } from "./keieiLogic.js";
 
 const pct = (a, b) => (b ? `${Math.round((a / b) * 1000) / 10}%` : "—");
 
 const K = {
-  ink: "#111827", sub: "#5B6573", line: "#E5EAF0", soft: "#F2F4F6",
-  pri: "#233E8B", priSoft: "#E6EBF7", ok: "#0F6E56", okSoft: "#E3F3EC", warn: "#7A4F00", warnSoft: "#FDF1D6", err: "#A32D2D", errSoft: "#FBE4E2",
+  ink: color.ink, sub: color.sub, line: color.line, soft: color.bg,
+  pri: color.pri, priSoft: color.priSoft, ok: color.ok, okSoft: color.okSoft, warn: color.warnInk, warnSoft: color.warnSoft, err: color.err, errSoft: color.errSoft,
 };
 // 入力欄：案件（案件あり／共通費（案件なし）／未設定）
 export function ProjectField({ kind, value, suggestion, onChange, projects, setProjects, client, inputStyle, compact }) {
