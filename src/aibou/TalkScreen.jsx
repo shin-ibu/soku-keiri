@@ -39,7 +39,7 @@ function useStatus({ sales, opProfit, selMonth, invoices }) {
 }
 
 // AIBOUから今日伝えること（データから毎回作る）
-function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo }) {
+function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths = [] }) {
   const out = [];
   const dueOf = (r) => { const inv = r.invoiceId && invoices.find((v) => v.id === r.invoiceId); return inv && inv.dueDate ? inv.dueDate : ""; };
   out.push({ id: "b-report", who: "aibou", tag: "報告", text: `${selMonth}の売上は${man(totalSales)}、経費は${man(totalExp)}です。` });
@@ -58,6 +58,9 @@ function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMon
   const ap = expenses.filter((e) => e.status === "未払い");
   if (ap.length) out.push({ id: "b-ap", who: "aibou", tag: "連絡", text: `未払いの経費が${ap.length}件、合計${yen(ap.reduce((s, e) => s + e.amount, 0))}あります。`, actions: [{ label: "一覧を見る", act: "go", to: "ar", tab: "out" }] });
 
+  const unset = [...sales, ...expenses].filter((r) => fiscalMonths.includes(r.month) && (r.project === undefined || r.project === null));
+  if (unset.length) out.push({ id: "b-unset", who: "aibou", tag: "相談", waiting: true, text: `案件が未設定の記録が${unset.length}件あります（合計${yen(unset.reduce((s, x) => s + x.amount, 0))}）。どの案件のものか決めると、案件ごとの粗利が正しく出せます。`, actions: [{ label: "設定する", act: "go", to: "projects", primary: true }] });
+
   if (hasDemo) out.push({ id: "b-demo", who: "aibou", tag: "相談", waiting: true, text: "今は見本の数字が入っています。見本を消して、自分の数字で始めますか？", actions: [{ label: "消して始める", act: "clearDemo", primary: true }, { label: "このまま見る", act: "say", text: "このまま見る" }] });
   return out;
 }
@@ -71,9 +74,12 @@ function replyTo(text, ctx) {
   if (/経費|レシート|領収書|払った/.test(t)) return { text: "経費の入力を開きます。入れ終わったら、こちらに戻ってきてください。", entry: "expenses" };
   if (/売上|売り上げ/.test(t)) return { text: "売上の入力を開きます。", entry: "sales" };
   if (/未入金|入金/.test(t)) return { text: `未入金の売上は${ctx.arCount}件、合計${yen(ctx.ar)}です。一覧を開きます。`, go: "ar", tab: "in" };
-  if (/利益|収支|もうか|儲/.test(t)) return { text: `${ctx.selMonth}の利益は${man(ctx.opProfit)}の見込みです。詳しい画面を開きます。`, go: "home" };
+  if (/利益|収支|もうか|儲/.test(t)) return { text: `${ctx.selMonth}の利益は${man(ctx.opProfit)}の見込みです。損益計算書を開きます。`, go: "pl" };
   if (/資金|残高|お金の流れ/.test(t)) return { text: "お金の流れの画面を開きます。", go: "cashflow" };
   if (/取引先|相手先/.test(t)) return { text: "取引先の一覧を開きます。", go: "partners" };
+  if (/案件/.test(t)) return { text: "案件の画面を開きます。案件ごとの粗利と、未設定の記録が見られます。", go: "projects" };
+  if (/損益|PL|ＰＬ|成績/.test(t)) return { text: "損益計算書を開きます。行の「?」で、それぞれの利益の意味が見られます。", go: "pl" };
+  if (/貸借|BS|ＢＳ|財産/.test(t)) return { text: "貸借対照表を開きます。", go: "bs" };
   if (/ありがと/.test(t)) return { text: "どういたしまして。ほかにもあれば、いつでもどうぞ。" };
   return { text: `「${text}」を受け取りました。まだAIにつながる前の版なので、今は「売上」「経費」「請求書」「入金」「利益」「お金の流れ」「取引先」などの言葉で動けます。` };
 }
@@ -89,6 +95,7 @@ const IC = {
   yen: <><circle cx="12" cy="12" r="9" /><path d="M8.5 7l3.5 4.5L15.5 7M12 11.5V18M9 13h6M9 15.5h6" /></>,
   chart: <><path d="M3 3v18h18" /><path d="M8 15v3M13 10v8M18 6v12" /></>,
   inbox: <><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z" /></>,
+  folder: <><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></>,
   people: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" /></>,
   camera: <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></>,
   mic: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /><path d="M12 18v4" /></>,
@@ -134,14 +141,14 @@ function Bubble({ m, onAction }) {
 }
 
 export default function TalkScreen(p) {
-  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab } = p;
+  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab, projects = [], fiscalMonths = [] } = p;
   const [log, setLog] = useState(loadTalk);
   const [draft, setDraft] = useState("");
   const [listening, setListening] = useState(false);
   const endRef = useRef(null);
   const recRef = useRef(null);
   const status = useStatus({ sales, opProfit, selMonth, invoices });
-  const briefing = useMemo(() => buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo }), [sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo]);
+  const briefing = useMemo(() => buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths }), [sales, expenses, invoices, totalSales, totalExp, selMonth, hasDemo, fiscalMonths]);
   const owner = master?.company?.name ? `${master.company.name}の相棒` : "社長の相棒";
 
   useEffect(() => { saveTalk(log); }, [log]);
@@ -206,12 +213,13 @@ export default function TalkScreen(p) {
 
   const signal = { green: [C.okSoft, C.ok], yellow: [C.warnSoft, C.warn], red: [C.errSoft, C.err] }[status.level];
   const arCount = sales.filter((s) => s.status === "未入金").length;
+  const unsetCount = [...sales, ...expenses].filter((r) => fiscalMonths.includes(r.month) && (r.project === undefined || r.project === null)).length;
   const tiles = [
     { label: "予定", sub: "準備中", icon: IC.cal, on: () => notReady("予定", "本業の予定と経営の仕事を一緒に並べる画面を作っています。") },
     { label: "入金・支払", sub: arCount ? `未入金 ${arCount}件` : "未入金なし", icon: IC.yen, on: () => { if (setArTab) setArTab("in"); setScreen("ar"); } },
-    { label: "収支", sub: status.label, icon: IC.chart, on: () => setScreen("home") },
+    { label: "収支", sub: "PL・BS", icon: IC.chart, on: () => setScreen("pl") },
     { label: "受け箱", sub: "準備中", icon: IC.inbox, on: () => notReady("受け箱", "請求書やレシートの写真を読み取る仕組みを作っています。") },
-    { label: "取引先", sub: `${(master?.counterparties || []).length}件`, icon: IC.people, on: () => setScreen("partners") },
+    { label: "案件", sub: unsetCount ? `未設定 ${unsetCount}件` : `進行中 ${projects.filter((x) => x.status === "進行中").length}件`, icon: IC.folder, on: () => setScreen("projects") },
     { label: "撮る", sub: "レシート・請求書", icon: IC.camera, on: () => notReady("撮る", "写真から読み取る機能は、受け箱と一緒に作ります。"), dark: true },
   ];
 

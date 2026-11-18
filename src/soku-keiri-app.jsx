@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import TalkScreen from "./aibou/TalkScreen.jsx";
+import { ProjectsScreen, PLLearnScreen, BSScreen, ProjectField } from "./aibou/keiei.jsx";
+import { suggestProject, openingCashOf } from "./aibou/keieiLogic.js";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
@@ -106,21 +108,26 @@ const newId = () => Date.now();
 const safeFileName = (s) => String(s||"").replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 40);
 
 const DEMO_SALES = [
-  { id:1, date:"2025-05-02", month:"2025年5月", type:"売掛", client:"㈱〇〇商事", amount:110000, tax:10, memo:"Web制作費", status:"未入金" },
+  { id:1, date:"2025-05-02", month:"2025年5月", type:"売掛", client:"㈱〇〇商事", amount:110000, tax:10, memo:"Web制作費", status:"未入金", project:9001 },
   { id:2, date:"2025-05-05", month:"2025年5月", type:"売掛", client:"□□デザイン", amount:220000, tax:10, memo:"ロゴ制作", status:"未入金" },
-  { id:3, date:"2025-05-08", month:"2025年5月", type:"現金", client:"△△工務店", amount:55000, tax:10, memo:"コンサル", status:"入金済" },
-  { id:4, date:"2025-05-09", month:"2025年5月", type:"売掛", client:"◇◇㈱", amount:330000, tax:10, memo:"システム開発", status:"未入金" },
-  { id:5, date:"2025-04-28", month:"2025年4月", type:"売掛", client:"㈱△△", amount:165000, tax:10, memo:"保守費", status:"入金済" },
-  { id:6, date:"2025-04-10", month:"2025年4月", type:"現金", client:"〇×商会", amount:88000, tax:10, memo:"コンサル", status:"入金済" },
+  { id:3, date:"2025-05-08", month:"2025年5月", type:"現金", client:"△△工務店", amount:55000, tax:10, memo:"コンサル", status:"入金済", project:"common" },
+  { id:4, date:"2025-05-09", month:"2025年5月", type:"売掛", client:"◇◇㈱", amount:330000, tax:10, memo:"システム開発", status:"未入金", project:9002 },
+  { id:5, date:"2025-04-28", month:"2025年4月", type:"売掛", client:"㈱△△", amount:165000, tax:10, memo:"保守費", status:"入金済", project:9001 },
+  { id:6, date:"2025-04-10", month:"2025年4月", type:"現金", client:"〇×商会", amount:88000, tax:10, memo:"コンサル", status:"入金済", project:"common" },
 ];
 const DEMO_EXP = [
-  { id:1, date:"2025-05-01", month:"2025年5月", type:"買掛", client:"〇〇ビル",   account:"地代家賃",   amount:50000,  tax:10, memo:"5月家賃",    status:"支払済" },
-  { id:2, date:"2025-05-02", month:"2025年5月", type:"カード", client:"△△通信", account:"通信費",     amount:12000,  tax:10, memo:"スマホ代",   status:"支払済" },
-  { id:3, date:"2025-05-03", month:"2025年5月", type:"買掛", client:"□□制作所", account:"外注費",     amount:95000,  tax:10, memo:"LP制作外注", status:"未払い" },
-  { id:4, date:"2025-05-05", month:"2025年5月", type:"買掛", client:"◇◇広告",   account:"広告宣伝費", amount:38000,  tax:10, memo:"SNS広告",    status:"未払い" },
+  { id:1, date:"2025-05-01", month:"2025年5月", type:"買掛", client:"〇〇ビル",   account:"地代家賃",   amount:50000,  tax:10, memo:"5月家賃",    status:"支払済", project:"common" },
+  { id:2, date:"2025-05-02", month:"2025年5月", type:"カード", client:"△△通信", account:"通信費",     amount:12000,  tax:10, memo:"スマホ代",   status:"支払済", project:"common" },
+  { id:3, date:"2025-05-03", month:"2025年5月", type:"買掛", client:"□□制作所", account:"外注費",     amount:95000,  tax:10, memo:"LP制作外注", status:"未払い", project:9002 },
+  { id:4, date:"2025-05-05", month:"2025年5月", type:"買掛", client:"◇◇広告",   account:"広告宣伝費", amount:38000,  tax:10, memo:"SNS広告",    status:"未払い", project:"common" },
   { id:5, date:"2025-05-07", month:"2025年5月", type:"現金", client:"文具店",    account:"消耗品費",   amount:3300,   tax:10, memo:"コピー用紙", status:"支払済" },
-  { id:6, date:"2025-04-01", month:"2025年4月", type:"買掛", client:"〇〇ビル",  account:"地代家賃",   amount:50000,  tax:10, memo:"4月家賃",    status:"支払済" },
-  { id:7, date:"2025-04-15", month:"2025年4月", type:"カード", client:"◇◇広告", account:"広告宣伝費", amount:30000,  tax:10, memo:"広告費",    status:"支払済" },
+  { id:6, date:"2025-04-01", month:"2025年4月", type:"買掛", client:"〇〇ビル",  account:"地代家賃",   amount:50000,  tax:10, memo:"4月家賃",    status:"支払済", project:"common" },
+  { id:7, date:"2025-04-15", month:"2025年4月", type:"カード", client:"◇◇広告", account:"広告宣伝費", amount:30000,  tax:10, memo:"広告費",    status:"支払済", project:"common" },
+];
+
+const DEMO_PROJECTS = [
+  { id:9001, name:"Web制作（㈱〇〇商事）", client:"㈱〇〇商事", status:"進行中", demo:true },
+  { id:9002, name:"システム開発（◇◇㈱）", client:"◇◇㈱", status:"進行中", demo:true },
 ];
 
 // 見本データの日付を、開いた日の「今月・先月」に置きかえる（初めて開いた人に、空の画面や去年の数字を見せない）
@@ -236,7 +243,9 @@ function Sidebar({ screen, setScreen, taxMode, setTaxMode, opInvoice, showOPModa
     { id:"records",  icon:"≣", label:"記録" },
     { id:"sales",    icon:"↑", label:"売上の一覧" },
     { id:"expenses", icon:"↓", label:"経費の一覧" },
-    { id:"pl",       icon:"≡", label:"損益計算書" },
+    { id:"projects", icon:"▦", label:"案件" },
+    { id:"pl",       icon:"≡", label:"損益計算書（PL）" },
+    { id:"bs",       icon:"⊟", label:"貸借対照表（BS）" },
     { id:"ar",       icon:"◎", label:"未入金・未払金" },
     { id:"cashflow", icon:"⇄", label:"資金繰り" },
     { id:"partners", icon:"☺", label:"取引先" },
@@ -302,7 +311,7 @@ function BottomNav({ screen, setScreen, onPlus }) {
   const on = (ids) => ids.includes(screen);
   const items = [
     ["talk","chat","AIBOU",["talk"]], ["home","home","ホーム",["home"]], ["records","list","記録",["records","sales","expenses"]], null,
-    ["cashflow","chart","お金の流れ",["cashflow"]], ["settings","gear","設定",["settings","partners","pl","ar","master","invoice","invoice-new"]],
+    ["cashflow","chart","お金の流れ",["cashflow"]], ["settings","gear","設定",["settings","partners","pl","bs","projects","ar","master","invoice","invoice-new"]],
   ];
   return (
     <nav className="bottom-nav" aria-label="メニュー">
@@ -461,9 +470,10 @@ export default function App() {
   const [opInvoice,   setOpInvoice]   = useState(!!saved?.opInvoice);
   const [showOPModal, setShowOPModal] = useState(false);
   const [entry,       setEntry]       = useState(null);
-  const [arTab,       setArTab]       = useState("in");   // 未入金・未払金：スマホで見せる側   // 記録を追加（下から出る）："sales" | "expenses" | null
+  const [arTab,       setArTab]       = useState("in");
+  const [projects,    setProjects]    = useState(saved ? (saved.projects || []) : DEMO_PROJECTS);   // 案件   // 未入金・未払金：スマホで見せる側   // 記録を追加（下から出る）："sales" | "expenses" | null
 
-  useEffect(() => { saveAll({ sales, expenses, master, invoices, invoiceSeq, opInvoice }); }, [sales, expenses, master, invoices, invoiceSeq, opInvoice]);
+  useEffect(() => { saveAll({ sales, expenses, master, invoices, invoiceSeq, opInvoice, projects }); }, [sales, expenses, master, invoices, invoiceSeq, opInvoice, projects]);
   const showToast = (msg, type="success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
   // 入力欄から、その場で相手先に足す
   const addCounterparty = (name, kind="売り先") => {
@@ -487,11 +497,11 @@ export default function App() {
   const ap          = expenses.filter(e => e.status === "未払い").reduce((s,r) => s + r.amount, 0);
   const val         = (n) => taxMode === "inc" ? fmt(n) : fmtEx(n);
 
-  const shared = { screen, setScreen, taxMode, setTaxMode, sales, setSales, expenses, setExpenses, master, setMaster, selMonth, setSelMonth, totalSales, totalExp, grossProfit, opProfit, ar, ap, val, curSales, curExp, showToast, genka, sga, setModal, opInvoice, showOPModal: () => setShowOPModal(true), fiscalMonths, invoices, setInvoices, invoiceSeq, setInvoiceSeq, addCounterparty, arTab, setArTab };
-  const Screens = { home:HomeScreen, records:RecordsScreen, settings:SettingsScreen, sales:SalesScreen, expenses:ExpenseScreen, pl:PLScreen, ar:ARScreen, cashflow:CashflowScreen, invoice:InvoiceScreen, "invoice-new":InvoiceNew, partners:PartnersScreen, master:MasterScreen };
+  const shared = { screen, setScreen, taxMode, setTaxMode, sales, setSales, expenses, setExpenses, master, setMaster, selMonth, setSelMonth, totalSales, totalExp, grossProfit, opProfit, ar, ap, val, curSales, curExp, showToast, genka, sga, setModal, opInvoice, showOPModal: () => setShowOPModal(true), fiscalMonths, invoices, setInvoices, invoiceSeq, setInvoiceSeq, addCounterparty, arTab, setArTab, projects, setProjects };
+  const Screens = { home:HomeScreen, records:RecordsScreen, settings:SettingsScreen, sales:SalesScreen, expenses:ExpenseScreen, pl:PLLearnScreen, projects:ProjectsScreen, bs:BSScreen, ar:ARScreen, cashflow:CashflowScreen, invoice:InvoiceScreen, "invoice-new":InvoiceNew, partners:PartnersScreen, master:MasterScreen };
   const Screen = Screens[screen] || HomeScreen;
-  const hasDemo = sales.some(r=>r.demo) || expenses.some(r=>r.demo) || master.counterparties.some(c=>c.sample);
-  const clearDemo = () => { setSales(p=>p.filter(r=>!r.demo)); setExpenses(p=>p.filter(r=>!r.demo)); setMaster(m=>({ ...m, counterparties: m.counterparties.filter(c=>!c.sample) })); showToast("見本を消しました。自分の数字を入れられます"); };
+  const hasDemo = sales.some(r=>r.demo) || expenses.some(r=>r.demo) || master.counterparties.some(c=>c.sample) || projects.some(p=>p.demo);
+  const clearDemo = () => { setSales(p=>p.filter(r=>!r.demo)); setExpenses(p=>p.filter(r=>!r.demo)); setProjects(p=>p.filter(x=>!x.demo)); setMaster(m=>({ ...m, counterparties: m.counterparties.filter(c=>!c.sample) })); showToast("見本を消しました。自分の数字を入れられます"); };
 
   // AIBOU：トーク画面は全画面で出す（経理の各画面はこれまでどおり）
   if (screen === "talk") return (
@@ -744,75 +754,6 @@ function ExpenseScreen({ setExpenses, setSelMonth, selMonth, val, showToast, cur
 }
 
 // ── PL ────────────────────────────────────────────────────────────────────────
-function PLScreen({ setScreen, selMonth, setSelMonth, val, totalSales, genka, grossProfit, sga, opProfit, curExp, setModal, master, fiscalMonths, sales, expenses }) {
-  const [viewMode, setViewMode] = useState("monthly");
-  const fiscalNum = master.company.fiscalNum || 1;
-  const fiscalIdx = fiscalMonths.indexOf(selMonth);
-
-  const annualSales = fiscalMonths.reduce((s,m)=>s+sales.filter(r=>r.month===m).reduce((a,r)=>a+r.amount,0),0);
-  const annualExp   = fiscalMonths.reduce((s,m)=>s+expenses.filter(r=>r.month===m).reduce((a,r)=>a+r.amount,0),0);
-  const annualGenka = fiscalMonths.reduce((s,m)=>s+expenses.filter(r=>r.month===m&&r.account==="売上原価").reduce((a,r)=>a+r.amount,0),0);
-  const annualSga   = annualExp - annualGenka;
-  const annualGross = annualSales - annualGenka;
-  const annualOp    = annualGross - annualSga;
-
-  const plRows = (tSales, gk, gross, sg, op) => [
-    { label:"売上高",           v:tSales, lv:0, color:"#0F6E56", bold:true },
-    { label:"売上原価",         v:gk,     lv:1 },
-    { label:"粗利",             v:gross,  lv:0, color:gross>0?"#185FA5":"#A32D2D", bold:true, hl:true },
-    ...master.accounts.filter(a=>a.category==="sga").map(a=>{
-      const amt = viewMode==="annual"
-        ? fiscalMonths.reduce((s,m)=>s+expenses.filter(e=>e.month===m&&e.account===a.label).reduce((x,r)=>x+r.amount,0),0)
-        : curExp.filter(e=>e.account===a.label).reduce((s,r)=>s+r.amount,0);
-      return { label:a.label, v:amt, lv:1, hide:amt===0 };
-    }).filter(r=>!r.hide),
-    { label:"販管費 計",        v:sg,     lv:1, bold:true },
-    { label:"営業利益",         v:op,     lv:0, color:op>0?"#0F6E56":"#A32D2D", bold:true, hl:true, big:true },
-  ];
-
-  const monthlyRows = plRows(totalSales, genka, grossProfit, sga, opProfit);
-  const annualRows  = plRows(annualSales, annualGenka, annualGross, annualSga, annualOp);
-  const rows = viewMode==="annual" ? annualRows : monthlyRows;
-
-  return (
-    <div className="screen-wrap b-screen">
-      <ScreenHead title="損益計算書" onBack={() => setScreen("settings")} />
-      <div style={s.pageHeader}>
-        <div>
-          <div style={{ fontSize:14, color:T.sub }}>第{fiscalNum}期　{fiscalMonths[0]}〜{fiscalMonths[11]}</div>
-        </div>
-        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-          <div style={s.taxSwitch}>
-            <button style={{ ...s.taxBtn, ...(viewMode==="monthly"?s.taxActive:{}) }} onClick={()=>setViewMode("monthly")}>月次</button>
-            <button style={{ ...s.taxBtn, ...(viewMode==="annual"?s.taxActive:{}) }} onClick={()=>setViewMode("annual")}>年間累計</button>
-          </div>
-          <button style={s.btnS}>CSV出力</button>
-        </div>
-      </div>
-      {viewMode==="monthly" && <MonthBar selMonth={selMonth} setSelMonth={setSelMonth} fiscalMonths={fiscalMonths} />}
-      <div style={s.plWrap}>
-        <div style={s.plHdr}>
-          <span>{viewMode==="annual" ? `第${fiscalNum}期　年間累計` : `${selMonth}　${fiscalIdx>=0?`第${fiscalNum}期 ${fiscalIdx+1}ヶ月目`:""}`}</span>
-        </div>
-        {rows.map((r,i) => (
-          <div key={i} style={{ ...s.plRow, background:r.hl?(r.big?"#E8F0F7":"#E8F0F7"):i%2===0?"#fff":"#fafafa", borderTop:r.hl?"1px solid #C9DAE8":undefined }}>
-            <span style={{ paddingLeft:r.lv*24, fontSize:r.big?15:13, fontWeight:r.bold?600:400, color:r.color||(r.lv===1?"#777":"#222") }}>
-              {r.lv===1&&<span style={{ marginRight:6, color:"#ddd" }}>└</span>}{r.label}
-            </span>
-            <N v={val(r.v)} setModal={setModal} modal={{ title:r.label, amount:val(r.v), color:r.color }} style={{ fontSize:r.big?18:14, fontWeight:r.bold?800:500, color:r.color||"#222" }} />
-          </div>
-        ))}
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:12 }}>
-        {[
-          { l:"粗利率",     v:(viewMode==="annual"?annualSales:totalSales)?Math.round((viewMode==="annual"?annualGross:grossProfit)/(viewMode==="annual"?annualSales:totalSales)*100)+"%":"—", c:"#185FA5" },
-          { l:"営業利益率", v:(viewMode==="annual"?annualSales:totalSales)?Math.round((viewMode==="annual"?annualOp:opProfit)/(viewMode==="annual"?annualSales:totalSales)*100)+"%":"—", c:"#0F6E56" },
-        ].map((c,i) => <div key={i} style={s.statCard}><div style={s.statLabel}>{c.l}</div><div style={{ fontSize:24, fontWeight:800, color:c.c }}>{c.v}</div></div>)}
-      </div>
-    </div>
-  );
-}
-
 // ── AR/AP ─────────────────────────────────────────────────────────────────────
 function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setModal, setScreen, arTab="in", setArTab=()=>{} }) {
   const unpS=sales.filter(s=>s.status==="未入金"), paidS=sales.filter(s=>s.status==="入金済");
@@ -863,14 +804,15 @@ function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setM
 }
 
 // ── CASHFLOW ──────────────────────────────────────────────────────────────────
-function CashflowScreen({ val, sales, expenses, setModal, fiscalMonths, setScreen, ar, ap, selMonth, setSelMonth }) {
+function CashflowScreen({ val, sales, expenses, setModal, fiscalMonths, setScreen, ar, ap, selMonth, setSelMonth, master }) {
   const ms = fiscalMonths;
+  const opening = openingCashOf(master); const open0 = opening ?? 1000000;
   const dIn  = ms.map(m=>sales.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
   const dOut = ms.map(m=>expenses.filter(r=>r.month===m).reduce((s,r)=>s+r.amount,0));
-  const bal  = dIn.map((v,i)=>{ let b=1000000; for(let j=0;j<=i;j++) b+=dIn[j]-dOut[j]; return b; });
+  const bal  = dIn.map((v,i)=>{ let b=open0; for(let j=0;j<=i;j++) b+=dIn[j]-dOut[j]; return b; });
   const mkIn =(i)=>({ title:`${ms[i]}分　入金合計`,amount:val(dIn[i]),rows:sales.filter(r=>r.month===ms[i]).map(r=>({ "相手先":r.client,"金額":val(r.amount) })) });
   const mkOut=(i)=>({ title:`${ms[i]}分　支払合計`,amount:val(dOut[i]),rows:expenses.filter(r=>r.month===ms[i]).map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) });
-  const mkBal=(i)=>({ title:`${ms[i]}　月末残高`,amount:val(bal[i]),formula:i===0?`期首の残高 ¥1,000,000（仮の値）\n＋ 入金 ${val(dIn[0])}\nー 支払 ${val(dOut[0])}\n＝ ${val(bal[0])}`:`前月残高 ${val(bal[i-1])}\n＋ 入金 ${val(dIn[i])}\nー 支払 ${val(dOut[i])}\n＝ ${val(bal[i])}` });
+  const mkBal=(i)=>({ title:`${ms[i]}　月末残高`,amount:val(bal[i]),formula:i===0?`期首の残高 ${val(open0)}${opening===null?"（仮の値）":""}\n＋ 入金 ${val(dIn[0])}\nー 支払 ${val(dOut[0])}\n＝ ${val(bal[0])}`:`前月残高 ${val(bal[i-1])}\n＋ 入金 ${val(dIn[i])}\nー 支払 ${val(dOut[i])}\n＝ ${val(bal[i])}` });
   const selIdx = Math.max(0, ms.indexOf(selMonth) >= 0 ? ms.indexOf(selMonth) : ms.length - 1);
   const start = Math.max(0, Math.min(selIdx - 5, ms.length - 6));
   const idx6 = ms.slice(start, start + 6).map((_, k) => start + k);
@@ -895,11 +837,11 @@ function CashflowScreen({ val, sales, expenses, setModal, fiscalMonths, setScree
             </button>
           ); })}
         </div>
-        <p className="note-warn">期のはじめ（{ms[0]}）の残高は、仮に ¥1,000,000 として計算しています（本当の残高を入れる欄はまだありません）。</p>
+        {opening===null ? <p className="note-warn">期のはじめ（{ms[0]}）の残高が未入力のため、仮に ¥1,000,000 として計算しています。<button className="btn-sub sm" style={{ marginLeft:8 }} onClick={() => setScreen("bs")}>期首の残高を入れる</button></p> : <p className="muted">期のはじめ（{ms[0]}）の残高 {val(opening)} から計算しています。</p>}
       </div>
       <div className="card tbl-b">
         <div className="t-h">{ms[sel]}分の見込み</div>
-        <div className="t-r"><span>月はじめの残高</span><N v={val(sel===0 ? 1000000 : bal[sel-1])} setModal={setModal} modal={sel===0 ? mkBal(0) : mkBal(sel-1)} style={{ borderBottom:"none" }} /></div>
+        <div className="t-r"><span>月はじめの残高</span><N v={val(sel===0 ? open0 : bal[sel-1])} setModal={setModal} modal={sel===0 ? mkBal(0) : mkBal(sel-1)} style={{ borderBottom:"none" }} /></div>
         <div className="t-r"><span>入るお金（売上）</span><N v={val(dIn[sel])} setModal={setModal} modal={mkIn(sel)} style={{ borderBottom:"none" }} /></div>
         <div className="t-r"><span>出るお金（経費）</span><N v={"－" + val(dOut[sel])} setModal={setModal} modal={mkOut(sel)} style={{ borderBottom:"none" }} /></div>
         <div className="t-r total"><span>月末の残高（見込み）</span><N v={val(bal[sel])} setModal={setModal} modal={mkBal(sel)} style={{ borderBottom:"none" }} /></div>
@@ -1050,10 +992,11 @@ const canShareFile = (file) => { try { return !!(navigator.canShare && navigator
 const blankItem = () => ({ desc:"", qty:1, unit:"式", price:"", tax:10 });
 const blankInvForm = () => ({ cpId:null, client:"", honorific:"御中", clientAddr:"", contact:"", issueDate:today(), dueDate:"", subject:"", memo:"" });
 
-function InvoiceScreen({ setScreen, master, sales, setSales, showToast, invoices, setInvoices, invoiceSeq, setInvoiceSeq, addCounterparty, embed, startNew: startNewProp }) {
+function InvoiceScreen({ setScreen, master, sales, setSales, showToast, invoices, setInvoices, invoiceSeq, setInvoiceSeq, addCounterparty, embed, startNew: startNewProp, expenses=[], projects=[], setProjects=()=>{} }) {
   const [mode, setMode] = useState(embed ? "list" : startNewProp ? "new" : (invoices.length ? "list" : "new"));
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(blankInvForm);
+  const invSug = suggestProject({ kind:"sale", client:form.client, sales, expenses, projects });
   const [items, setItems] = useState([blankItem()]);
   const [doneInv, setDoneInv] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -1079,7 +1022,7 @@ function InvoiceScreen({ setScreen, master, sales, setSales, showToast, invoices
     const saleId = newId(), invId = saleId + 1;
     const rates = calc.rates.map(r => r.rate);
     const inv = { id:invId, no, year, seq, ...form, client:form.client.trim(), items:cleanItems, calc, issuer:issuer(), saleId, createdAt:new Date().toISOString() };
-    setSales(p => [...p, { id:saleId, date:form.issueDate, month:monthOfDate(form.issueDate), type:"売掛", client:inv.client, amount:calc.total, tax: rates.length===1 ? rates[0] : 10, memo:`請求書 ${no}${form.subject?` ${form.subject}`:""}`, status:"未入金", invoiceId:invId }]);
+    setSales(p => [...p, { id:saleId, date:form.issueDate, month:monthOfDate(form.issueDate), type:"売掛", client:inv.client, amount:calc.total, tax: rates.length===1 ? rates[0] : 10, project: form.project !== undefined ? form.project : (invSug ? invSug.value : null), memo:`請求書 ${no}${form.subject?` ${form.subject}`:""}`, status:"未入金", invoiceId:invId }]);
     setInvoices(p => [...p, inv]);
     setInvoiceSeq(p => ({ ...p, [year]: seq }));
     setDoneInv(inv); setMode("done");
@@ -1206,6 +1149,7 @@ function InvoiceScreen({ setScreen, master, sales, setSales, showToast, invoices
                     <CpPicker value={form.client} onChange={v => setForm(f => ({ ...f, client:v, cpId: f.cpId && master.counterparties.find(c => c.id===f.cpId)?.name===v ? f.cpId : null }))} onPick={pickCp} counterparties={master.counterparties} addCounterparty={addCounterparty} kind="売り先" />
                   </FR>
                 </div>
+                <div style={{ gridColumn:"1 / -1" }}><FR label="案件" hint={"どの仕事の請求かを選びます。\n請求書から作られる売上に、この案件が付きます。"}><ProjectField kind="sale" value={form.project} suggestion={invSug} onChange={v => sf("project", v)} projects={projects} setProjects={setProjects} client={form.client} inputStyle={s.inp} /></FR></div>
                 <FR label="敬称"><select style={s.inp} value={form.honorific} onChange={e => sf("honorific", e.target.value)}><option>御中</option><option>様</option></select></FR>
                 <FR label="ご担当者（なくてもOK）"><input style={s.inp} value={form.contact} onChange={e => sf("contact", e.target.value)} placeholder="山田" /></FR>
                 <div style={{ gridColumn:"1 / -1" }}><FR label="相手の住所（なくてもOK）"><input style={s.inp} value={form.clientAddr} onChange={e => sf("clientAddr", e.target.value)} placeholder="東京都…" /></FR></div>
@@ -1541,10 +1485,11 @@ const ScreenHead = ({ title, onBack, right }) => (
 const greeting = () => { const h = new Date().getHours(); return h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "おつかれさまです"; };
 
 // ── 入力：売上（もとは売上入力の画面の中にあった。処理はそのまま） ─────────────
-function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMonths, addCounterparty, onDone }) {
+function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMonths, addCounterparty, onDone, sales=[], expenses=[], projects=[], setProjects=()=>{} }) {
   const [form, setForm] = useState({ date:today(), month:monthOfDate(today()), type:"売掛", client:"", amount:"", tax:10, memo:"", status:"未入金" });
   const [showAlert, setShowAlert] = useState(false);
   const sf = (k,v) => setForm(f=>({...f,[k]:v}));
+  const sug = suggestProject({ kind:"sale", client:form.client, sales, expenses, projects });
   // 金額がこの月の平均と大きく違うときは、保存の前に一度だけ確かめる
   const isOutlier = () => {
     if (!form.amount || curSales.length===0) return false;
@@ -1555,15 +1500,17 @@ function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMo
     if (!form.client||!form.amount) { showToast("相手先と金額は必須です","error"); return; }
     if (force!==true && !showAlert && isOutlier()) { setShowAlert(true); return; }
     setShowAlert(false);
-    setSales(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "入金済" : "未入金" }]); setSelMonth(form.month);
+    const project = form.project !== undefined ? form.project : (sug ? sug.value : null);
+    setSales(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "入金済" : "未入金", project }]); setSelMonth(form.month);
     setForm({ date:today(),month:monthOfDate(today()),type:"売掛",client:"",amount:"",tax:10,memo:"",status:"未入金" });
-    showToast(form.type==="現金" ? "売上を保存しました（入金済み）" : "売上を保存しました（未入金）");
+    showToast((form.type==="現金" ? "売上を保存しました（入金済み）" : "売上を保存しました（未入金）") + (project===null ? "。案件は未設定です" : ""));
     if (onDone) onDone();
   };
   return (
     <div className="bform">
       <AmountField value={form.amount} onChange={v=>sf("amount",v)} />
       <FR label="取引先（だれからの売上か）"><CpPicker value={form.client} onChange={v=>sf("client",v)} counterparties={master.counterparties} addCounterparty={addCounterparty} kind="売り先" /></FR>
+      <FR label="案件" hint={"どの仕事の売上かを選びます。\n案件ごとの粗利を出すのに使います。\n決まっていなければ「未設定」のままで、あとでAIBOUが確認します。"}><ProjectField kind="sale" value={form.project} suggestion={sug} onChange={v=>sf("project",v)} projects={projects} setProjects={setProjects} client={form.client} inputStyle={s.inp} /></FR>
       <div className="two">
         <FR label="取引日"><input type="date" style={s.inp} value={form.date} onChange={e=>{ const v=e.target.value; setForm(f=>({ ...f, date:v, month: fiscalMonths.includes(monthOfDate(v)) ? monthOfDate(v) : f.month })); }} /></FR>
         <FR label="何月分の売上か" hint={"この売上は何月の仕事ですか？\n例）3月納品 → 3月　4月に請求しても3月と入力"}>
@@ -1582,13 +1529,14 @@ function SaleForm({ setSales, setSelMonth, showToast, curSales, master, fiscalMo
 }
 
 // ── 入力：経費（もとは経費入力の画面の中にあった。処理はそのまま） ─────────────
-function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fiscalMonths, addCounterparty, onDone }) {
+function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fiscalMonths, addCounterparty, onDone, sales=[], expenses=[], projects=[], setProjects=()=>{} }) {
   const [form, setForm] = useState({ date:today(), month:monthOfDate(today()), type:"現金", client:"", account:"", amount:"", tax:10, memo:"", status:"未払い" });
   const [freeText, setFreeText] = useState("");
   const [suggestion, setSuggestion] = useState(null);
   const [showAlert, setShowAlert] = useState(false);
   const sf = (k,v) => setForm(f=>({...f,[k]:v}));
   const onFree = (v) => { setFreeText(v); const sug=getSuggestion(v); setSuggestion(sug); if(sug) sf("account",sug); };
+  const pSug = suggestProject({ kind:"expense", client:form.client, account:form.account, sales, expenses, projects });
   const isOutlier = () => {
     if (!form.amount||curExp.length===0) return false;
     const avg = curExp.reduce((s,r)=>s+r.amount,0)/curExp.length;
@@ -1598,10 +1546,11 @@ function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fisc
     if (!form.client||!form.amount||!form.account) { showToast("相手先・科目・金額は必須です","error"); return; }
     if (force!==true && !showAlert && isOutlier()) { setShowAlert(true); return; }
     setShowAlert(false);
-    setExpenses(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "支払済" : "未払い" }]); setSelMonth(form.month);
+    const project = form.project !== undefined ? form.project : (pSug ? pSug.value : null);
+    setExpenses(p=>[...p,{ ...form,id:Date.now(),amount:Number(form.amount),status: form.type==="現金" ? "支払済" : "未払い", project }]); setSelMonth(form.month);
     setFreeText(""); setSuggestion(null);
     setForm({ date:today(),month:monthOfDate(today()),type:"現金",client:"",account:"",amount:"",tax:10,memo:"",status:"未払い" });
-    showToast(form.type==="現金" ? "経費を保存しました（支払済み）" : "経費を保存しました（未払金）");
+    showToast((form.type==="現金" ? "経費を保存しました（支払済み）" : "経費を保存しました（未払金）") + (project===null ? "。案件は未設定です" : ""));
     if (onDone) onDone();
   };
   const accountOptions = master.accounts.filter(a=>a.category!=="revenue");
@@ -1625,6 +1574,7 @@ function ExpenseForm({ setExpenses, setSelMonth, showToast, curExp, master, fisc
           {suggestion && form.account===suggestion && <span className="auto-tag">自動選択</span>}
         </div>
       </FR>
+      <FR label="案件" hint={"どの仕事のための経費かを選びます。\n家賃や通信費など、どの案件にも属さないものは「共通費」です。\n決まっていなければ「未設定」のままで、あとでAIBOUが確認します。"}><ProjectField kind="expense" value={form.project} suggestion={pSug} onChange={v=>sf("project",v)} projects={projects} setProjects={setProjects} client={form.client} inputStyle={s.inp} /></FR>
       <div className="two">
         <FR label="支払いのしかた" hint={"現金：その場で支払 → 支払済で登録します\n買掛（後日支払）・カード：支払前 → 未払金で登録します"}><select style={s.inp} value={form.type} onChange={e=>sf("type",e.target.value)}>{["現金","買掛","カード"].map(t=><option key={t} value={t}>{typeLabel(t)}</option>)}</select></FR>
         <FR label="消費税"><select style={s.inp} value={form.tax} onChange={e=>sf("tax",Number(e.target.value))}><option value={10}>税率 10%（標準）</option><option value={8}>税率 8%（軽減）</option><option value={0}>0%（非課税）</option></select></FR>
@@ -1731,7 +1681,9 @@ function SettingsScreen({ setScreen, taxMode, setTaxMode, opInvoice, showOPModal
   const items = [
     ["partners","people","取引先","名前・敬称・振込先口座"],
     ["invoice","doc","請求書", opInvoice ? "発行した請求書・新しく作る" : "オプション（未契約）"],
-    ["pl","list","損益計算書","月ごと・1年の利益"],
+    ["projects","doc","案件","案件ごとの粗利・利益、未設定の確認"],
+    ["pl","list","損益計算書（PL）","月ごと・1年の成績表と5つの利益"],
+    ["bs","list","貸借対照表（BS）","会社の財産の一覧（資産・負債・純資産）"],
     ["ar","yen","未入金・未払金","まとめて確認する"],
     ["master","gear","会社・口座・勘定科目","請求書に出る情報など"],
   ];
