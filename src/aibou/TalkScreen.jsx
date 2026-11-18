@@ -50,13 +50,13 @@ function buildBriefing({ sales, expenses, invoices, totalSales, totalExp, selMon
   soon.slice(0, 2).forEach((r) => {
     const d = daysUntil(dueOf(r));
     const when = d < 0 ? `期限（${md(dueOf(r))}）を${-d}日過ぎています` : d === 0 ? "今日が入金期限です" : `${md(dueOf(r))}が入金期限です`;
-    out.push({ id: `b-ar-${r.id}`, who: "aibou", tag: "連絡", text: `${r.client}の${yen(r.amount)}、${when}。`, actions: [{ label: "入金済にする", act: "markPaid", id: r.id, primary: true }, { label: "詳しく", act: "go", to: "ar" }] });
+    out.push({ id: `b-ar-${r.id}`, who: "aibou", tag: "連絡", text: `${r.client}の${yen(r.amount)}、${when}。`, actions: [{ label: "入金済にする", act: "markPaid", id: r.id, primary: true }, { label: "詳しく", act: "go", to: "ar", tab: "in" }] });
   });
   const restAr = unpaid.length - soon.slice(0, 2).length;
-  if (restAr > 0) out.push({ id: "b-ar-rest", who: "aibou", tag: "連絡", text: `未入金の売上が、ほかに${restAr}件あります（合計${yen(unpaid.filter((r) => !soon.slice(0, 2).includes(r)).reduce((s, r) => s + r.amount, 0))}）。`, actions: [{ label: "一覧を見る", act: "go", to: "ar" }] });
+  if (restAr > 0) out.push({ id: "b-ar-rest", who: "aibou", tag: "連絡", text: `未入金の売上が、ほかに${restAr}件あります（合計${yen(unpaid.filter((r) => !soon.slice(0, 2).includes(r)).reduce((s, r) => s + r.amount, 0))}）。`, actions: [{ label: "一覧を見る", act: "go", to: "ar", tab: "in" }] });
 
   const ap = expenses.filter((e) => e.status === "未払い");
-  if (ap.length) out.push({ id: "b-ap", who: "aibou", tag: "連絡", text: `未払いの経費が${ap.length}件、合計${yen(ap.reduce((s, e) => s + e.amount, 0))}あります。`, actions: [{ label: "一覧を見る", act: "go", to: "ar" }] });
+  if (ap.length) out.push({ id: "b-ap", who: "aibou", tag: "連絡", text: `未払いの経費が${ap.length}件、合計${yen(ap.reduce((s, e) => s + e.amount, 0))}あります。`, actions: [{ label: "一覧を見る", act: "go", to: "ar", tab: "out" }] });
 
   if (hasDemo) out.push({ id: "b-demo", who: "aibou", tag: "相談", waiting: true, text: "今は見本の数字が入っています。見本を消して、自分の数字で始めますか？", actions: [{ label: "消して始める", act: "clearDemo", primary: true }, { label: "このまま見る", act: "say", text: "このまま見る" }] });
   return out;
@@ -70,7 +70,7 @@ function replyTo(text, ctx) {
   if (/請求書/.test(t)) return { text: "請求書の画面を開きます。", go: "invoice" };
   if (/経費|レシート|領収書|払った/.test(t)) return { text: "経費の入力を開きます。入れ終わったら、こちらに戻ってきてください。", entry: "expenses" };
   if (/売上|売り上げ/.test(t)) return { text: "売上の入力を開きます。", entry: "sales" };
-  if (/未入金|入金/.test(t)) return { text: `未入金の売上は${ctx.arCount}件、合計${yen(ctx.ar)}です。一覧を開きます。`, go: "ar" };
+  if (/未入金|入金/.test(t)) return { text: `未入金の売上は${ctx.arCount}件、合計${yen(ctx.ar)}です。一覧を開きます。`, go: "ar", tab: "in" };
   if (/利益|収支|もうか|儲/.test(t)) return { text: `${ctx.selMonth}の利益は${man(ctx.opProfit)}の見込みです。詳しい画面を開きます。`, go: "home" };
   if (/資金|残高|お金の流れ/.test(t)) return { text: "お金の流れの画面を開きます。", go: "cashflow" };
   if (/取引先|相手先/.test(t)) return { text: "取引先の一覧を開きます。", go: "partners" };
@@ -134,7 +134,7 @@ function Bubble({ m, onAction }) {
 }
 
 export default function TalkScreen(p) {
-  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo } = p;
+  const { sales, setSales, expenses, invoices, master, totalSales, totalExp, opProfit, ar, selMonth, setScreen, onEntry, clearDemo, hasDemo, setArTab } = p;
   const [log, setLog] = useState(loadTalk);
   const [draft, setDraft] = useState("");
   const [listening, setListening] = useState(false);
@@ -151,6 +151,7 @@ export default function TalkScreen(p) {
 
   const run = (r) => {
     if (r.act === "clearDemo") clearDemo();
+    if (r.tab && setArTab) setArTab(r.tab);
     if (r.go) setTimeout(() => setScreen(r.go), 600);
     if (r.entry) setTimeout(() => onEntry(r.entry), 600);
   };
@@ -165,7 +166,7 @@ export default function TalkScreen(p) {
   };
 
   const onAction = (a, m) => {
-    if (a.act === "go") { push({ who: "me", text: a.label }, { who: "aibou", text: "画面を開きます。" }); setTimeout(() => setScreen(a.to), 400); return; }
+    if (a.act === "go") { if (a.tab && setArTab) setArTab(a.tab); push({ who: "me", text: a.label }, { who: "aibou", text: "画面を開きます。" }); setTimeout(() => setScreen(a.to), 400); return; }
     if (a.act === "markPaid") {
       const row = sales.find((s) => s.id === a.id);
       setSales((prev) => prev.map((s) => (s.id === a.id ? { ...s, status: "入金済" } : s)));
@@ -207,7 +208,7 @@ export default function TalkScreen(p) {
   const arCount = sales.filter((s) => s.status === "未入金").length;
   const tiles = [
     { label: "予定", sub: "準備中", icon: IC.cal, on: () => notReady("予定", "本業の予定と経営の仕事を一緒に並べる画面を作っています。") },
-    { label: "入金・支払", sub: arCount ? `未入金 ${arCount}件` : "未入金なし", icon: IC.yen, on: () => setScreen("ar") },
+    { label: "入金・支払", sub: arCount ? `未入金 ${arCount}件` : "未入金なし", icon: IC.yen, on: () => { if (setArTab) setArTab("in"); setScreen("ar"); } },
     { label: "収支", sub: status.label, icon: IC.chart, on: () => setScreen("home") },
     { label: "受け箱", sub: "準備中", icon: IC.inbox, on: () => notReady("受け箱", "請求書やレシートの写真を読み取る仕組みを作っています。") },
     { label: "取引先", sub: `${(master?.counterparties || []).length}件`, icon: IC.people, on: () => setScreen("partners") },

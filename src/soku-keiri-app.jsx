@@ -460,7 +460,8 @@ export default function App() {
   const [modal,       setModal]       = useState(null);
   const [opInvoice,   setOpInvoice]   = useState(!!saved?.opInvoice);
   const [showOPModal, setShowOPModal] = useState(false);
-  const [entry,       setEntry]       = useState(null);   // 記録を追加（下から出る）："sales" | "expenses" | null
+  const [entry,       setEntry]       = useState(null);
+  const [arTab,       setArTab]       = useState("in");   // 未入金・未払金：スマホで見せる側   // 記録を追加（下から出る）："sales" | "expenses" | null
 
   useEffect(() => { saveAll({ sales, expenses, master, invoices, invoiceSeq, opInvoice }); }, [sales, expenses, master, invoices, invoiceSeq, opInvoice]);
   const showToast = (msg, type="success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
@@ -486,7 +487,7 @@ export default function App() {
   const ap          = expenses.filter(e => e.status === "未払い").reduce((s,r) => s + r.amount, 0);
   const val         = (n) => taxMode === "inc" ? fmt(n) : fmtEx(n);
 
-  const shared = { screen, setScreen, taxMode, setTaxMode, sales, setSales, expenses, setExpenses, master, setMaster, selMonth, setSelMonth, totalSales, totalExp, grossProfit, opProfit, ar, ap, val, curSales, curExp, showToast, genka, sga, setModal, opInvoice, showOPModal: () => setShowOPModal(true), fiscalMonths, invoices, setInvoices, invoiceSeq, setInvoiceSeq, addCounterparty };
+  const shared = { screen, setScreen, taxMode, setTaxMode, sales, setSales, expenses, setExpenses, master, setMaster, selMonth, setSelMonth, totalSales, totalExp, grossProfit, opProfit, ar, ap, val, curSales, curExp, showToast, genka, sga, setModal, opInvoice, showOPModal: () => setShowOPModal(true), fiscalMonths, invoices, setInvoices, invoiceSeq, setInvoiceSeq, addCounterparty, arTab, setArTab };
   const Screens = { home:HomeScreen, records:RecordsScreen, settings:SettingsScreen, sales:SalesScreen, expenses:ExpenseScreen, pl:PLScreen, ar:ARScreen, cashflow:CashflowScreen, invoice:InvoiceScreen, "invoice-new":InvoiceNew, partners:PartnersScreen, master:MasterScreen };
   const Screen = Screens[screen] || HomeScreen;
   const hasDemo = sales.some(r=>r.demo) || expenses.some(r=>r.demo) || master.counterparties.some(c=>c.sample);
@@ -813,7 +814,7 @@ function PLScreen({ setScreen, selMonth, setSelMonth, val, totalSales, genka, gr
 }
 
 // ── AR/AP ─────────────────────────────────────────────────────────────────────
-function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setModal, setScreen }) {
+function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setModal, setScreen, arTab="in", setArTab=()=>{} }) {
   const unpS=sales.filter(s=>s.status==="未入金"), paidS=sales.filter(s=>s.status==="入金済");
   const unpE=expenses.filter(e=>e.status==="未払い"), paidE=expenses.filter(e=>e.status==="支払済");
   const arT=unpS.reduce((s,r)=>s+r.amount,0), apT=unpE.reduce((s,r)=>s+r.amount,0);
@@ -829,8 +830,10 @@ function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setM
   return (
     <div className="screen-wrap b-screen">
       <ScreenHead title="未入金・未払金" onBack={() => setScreen("settings")} />
+      {/* スマホでは入金と支払を切りかえて1つずつ見せる。PCは左右に並べたまま */}
+      <div className="ar-tabs"><Seg items={[["in",`入金（未入金 ${unpS.length}件）`],["out",`支払（未払金 ${unpE.length}件）`]]} value={arTab} onChange={setArTab} /></div>
       <div className="master-grid" style={{ display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:16 }}>
-        <div style={{ minWidth:0 }}>
+        <div className="ar-col" data-off={arTab!=="in" ? "1" : undefined} style={{ minWidth:0 }}>
           <h2 className="sec-h" style={{ marginTop:0, justifyContent:"space-between" }}><span>未入金<span className="inl">（入金前の売上）</span></span><N v={val(arT)} setModal={setModal} style={{ color:"#8A5300" }} modal={{ title:"未入金の合計", amount:val(arT), rows:unpS.map(r=>({ "相手先":r.client,"何月分":r.month,"金額":val(r.amount) })) }} /></h2>
           <div className="card list">
             {unpS.length===0 && <div className="empty">未入金はありません</div>}
@@ -842,7 +845,7 @@ function ARScreen({ sales, setSales, expenses, setExpenses, val, showToast, setM
             {paidS.map(r => <Row key={r.id} r={r} sub={`${r.month}分${r.memo ? `・${r.memo}` : ""}`} done="入金済" kind="入金済" />)}
           </div>
         </div>
-        <div style={{ minWidth:0 }}>
+        <div className="ar-col" data-off={arTab!=="out" ? "1" : undefined} style={{ minWidth:0 }}>
           <h2 className="sec-h" style={{ marginTop:0, justifyContent:"space-between" }}><span>未払金<span className="inl">（支払前の経費）</span></span><N v={val(apT)} setModal={setModal} style={{ color:"#B42318" }} modal={{ title:"未払金の合計", amount:val(apT), rows:unpE.map(r=>({ "相手先":r.client,"科目":r.account,"金額":val(r.amount) })) }} /></h2>
           <div className="card list">
             {unpE.length===0 && <div className="empty">未払金はありません</div>}
@@ -1982,7 +1985,10 @@ const css = `
   .bottom-nav button.on{ color:#4A7BA3; font-weight:700; }
   .bottom-nav button.plus{ flex:0 0 auto; width:56px; height:56px; border-radius:28px; background:#5B8FB9; color:#fff; margin-top:-22px; box-shadow:0 4px 12px rgba(91,143,185,0.35); }
 
+  .ar-tabs{ display:none; }
   @media(max-width:768px){
+    .ar-tabs{ display:block; margin-bottom:16px; }
+    .ar-col[data-off]{ display:none; }
     .sidebar{ display:none !important; }
     .bottom-nav{ display:flex !important; }
     .pc-only{ display:none !important; }
